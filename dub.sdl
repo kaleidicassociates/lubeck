@@ -1,0 +1,16 @@
+name "lubeck"
+description "Hight level linear algebra library for Dlang"
+authors "Ilya Yaroshenko" "Lars Tandle Kyllingstad (SciD author)"
+copyright "Copyright © 2017, Symmetry Investments & Kaleidic Associates; Copyright (c) 2009, Lars T. Kyllingstad (SciD)"
+license "BSL-1.0"
+dependency "mir-lapack" version="~>0.0.2"
+dependency "mir-blas" version="~>0.0.1"
+
+buildType "unittest" {
+	buildOptions "unittests" "debugMode" "debugInfo"
+	libs "blas" "cblas" "lapack"
+}
+buildType "unittest-cov" {
+	buildOptions "unittests" "coverage" "debugMode" "debugInfo"
+	libs "blas" "cblas" "lapack"
+}

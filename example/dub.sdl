@@ -1,0 +1,6 @@
+name "example"
+authors "Ilya Yaroshenko"
+dependency "lubeck" path="../"
+description "Lubeck example"
+license "BSL-1.0"
+libs "lapack" "blas" "cblas"
