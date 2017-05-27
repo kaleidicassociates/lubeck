@@ -1,3 +1,4 @@
+dist: trusty
 sudo: false
 
 language: d
@@ -11,5 +12,4 @@ script: dub --root example
 addons:
   apt:
     packages:
-      - libblas-dev
-      - liblapack-dev
+      - libatlas-base-dev
