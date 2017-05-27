@@ -11,4 +11,5 @@ script: dub --root example
 addons:
   apt:
     packages:
-      liblapack-dev
+      - libblas-dev
+      - liblapack-dev
