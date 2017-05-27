@@ -16,6 +16,13 @@ if A is not a square matrix.
  - `det`/`detSymmetric` - General/symmetric matrix determinant.
  - `eigSymmetric` - Eigenvalues and eigenvectors of symmetric matrix.
 
+### Related packages
+ - [mir-algorithm](https://github.com/libmir/mir-algorithm)
+ - [mir-lapack](https://github.com/libmir/mir-lapack)
+ - [mir-blas](https://github.com/libmir/mir-blas)
+ - [lapack](https://github.com/libmir/lapack)
+ - [cblas](https://github.com/DlangScience/cblas)
+
 ---------------
 
 This work has been sponsored by [Symmetry Investments](http://symmetryinvestments.com) and [Kaleidic Associates](https://github.com/kaleidicassociates).
