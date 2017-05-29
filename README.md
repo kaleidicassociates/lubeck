@@ -1,5 +1,5 @@
 # lubeck
-Hight level linear algebra library for Dlang
+High level linear algebra library for Dlang
 
 ## Required static libraries
  - `blas`/`cblas` - CBLAS API
