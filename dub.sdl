@@ -1,5 +1,5 @@
 name "lubeck"
-description "Hight level linear algebra library for Dlang"
+description "High level linear algebra library for Dlang"
 authors "Ilya Yaroshenko" "Lars Tandle Kyllingstad (SciD author)"
 copyright "Copyright © 2017, Symmetry Investments & Kaleidic Associates; Copyright (c) 2009, Lars T. Kyllingstad (SciD)"
 license "BSL-1.0"
