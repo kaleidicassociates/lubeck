@@ -18,3 +18,5 @@ dub.selections.json
 lubeck-test-library
 
 *.lst
+.vscode
+*.sublime-workspace

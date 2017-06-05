@@ -64,11 +64,11 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
     alias A = BlasType!IteratorA;
     alias B = BlasType!IteratorB;
     alias C = CommonType!(A, B);
-    static if (!is(Unqual!(DeepElementType!(typeof(a))) == C))
-        return .mtimes(a.as!A.slice, b);
+    static if (!is(Unqual!IteratorA == C*))
+        return .mtimes(a.as!C.slice, b);
     else
-    static if (!is(Unqual!(DeepElementType!(typeof(b))) == C))
-        return .mtimes(a, b.as!B.slice);
+    static if (!is(Unqual!IteratorB == C*))
+        return .mtimes(a, b.as!C.slice);
     else
     {
         static if (kindA != Contiguous)
@@ -133,11 +133,11 @@ Slice!(Contiguous, [1], BlasType!(IteratorA, IteratorB)*)
     alias A = BlasType!IteratorA;
     alias B = BlasType!IteratorB;
     alias C = CommonType!(A, B);
-    static if (!is(Unqual!(DeepElementType!(typeof(a))) == C))
-        return .mtimes(a.as!A.slice, b);
+    static if (!is(Unqual!IteratorA == C*))
+        return .mtimes(a.as!C.slice, b);
     else
-    static if (!is(Unqual!(DeepElementType!(typeof(b))) == C))
-        return .mtimes(a, b.as!B.slice);
+    static if (!is(Unqual!IteratorB == C*))
+        return .mtimes(a, b.as!C.slice);
     else
     {
         static if (kindA != Contiguous)
