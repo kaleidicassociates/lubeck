@@ -311,7 +311,16 @@ Params:
         `min(M,N)` rows of `vt` are returned in the ndslices `u` and `vt`.
 Returns: $(LREF SvdResult)
 +/
-auto svd(Flag!"allowDestroy" allowDestroy = No.allowDestroy, SliceKind kind, Iterator)(Slice!(kind, [2], Iterator) matrix, Flag!"slim" slim = No.slim)
+auto svd(
+        Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+        string algorithm = "gesvd",
+        SliceKind kind,
+        Iterator
+    )(
+        Slice!(kind, [2], Iterator) matrix,
+        Flag!"slim" slim = No.slim,
+    )
+    if (algorithm == "gesvd" || algorithm == "gesdd")
 {
     import lapack;
     alias T = BlasType!Iterator;
@@ -326,12 +335,22 @@ auto svd(Flag!"allowDestroy" allowDestroy = No.allowDestroy, SliceKind kind, Ite
     auto s = uninitSlice!T(min(m, n));
     auto u = uninitSlice!T(slim ? s.length : m, m);
     auto vt = uninitSlice!T(n, slim ? s.length : n);
-    auto iwork = uninitSlice!lapackint(s.length * 8);
 
-    auto jobz = slim ? 'S' : 'A';
+    static if (algorithm == "gesvd")
+    {
+        auto jobu = slim ? 'S' : 'A';
+        auto jobvt = slim ? 'S' : 'A';
+        auto work = gesvd_wq(jobu, jobvt, a, u.canonical, vt.canonical).uninitSlice!T;
+        auto info = gesvd(jobu, jobvt, a, s, u.canonical, vt.canonical, work);
+    }
+    else // gesdd
+    {
+        auto iwork = uninitSlice!lapackint(s.length * 8);
+        auto jobz = slim ? 'S' : 'A';
+        auto work = gesdd_wq(jobz, a, u.canonical, vt.canonical).uninitSlice!T;
+        auto info = gesdd(jobz, a, s, u.canonical, vt.canonical, work, iwork);
+    }
 
-    auto work = gesdd_wq(jobz, a, u.canonical, vt.canonical).uninitSlice!T;
-    auto info = gesdd(jobz, a, s, u.canonical, vt.canonical, work, iwork);
 
     import std.exception: enforce;
     enforce(info == 0, "svd: DBDSDC did not converge, updating process failed");
