@@ -342,6 +342,7 @@ auto svd(
         auto jobvt = slim ? 'S' : 'A';
         auto work = gesvd_wq(jobu, jobvt, a, u.canonical, vt.canonical).uninitSlice!T;
         auto info = gesvd(jobu, jobvt, a, s, u.canonical, vt.canonical, work);
+        enum msg = "svd: DBDSQR did not converge";
     }
     else // gesdd
     {
@@ -349,11 +350,11 @@ auto svd(
         auto jobz = slim ? 'S' : 'A';
         auto work = gesdd_wq(jobz, a, u.canonical, vt.canonical).uninitSlice!T;
         auto info = gesdd(jobz, a, s, u.canonical, vt.canonical, work, iwork);
+        enum msg = "svd: DBDSDC did not converge, updating process failed";
     }
 
-
     import std.exception: enforce;
-    enforce(info == 0, "svd: DBDSDC did not converge, updating process failed");
+    enforce(info == 0, msg);
     return SvdResult!T(vt, s, u); //transposed
 }
 
