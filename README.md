@@ -5,6 +5,8 @@ High level linear algebra library for Dlang
  - `blas`/`cblas` - CBLAS API
  - `lapack` - FORTRAN 77 LAPACK API
 
+See the `dub.sdl` in the example folder.
+
 ## API
  - `mtimes` - General matrix-matrix, row-matrix, matrix-column, and row-column multiplications.
  - `mldivide` - Solve systems of linear equations AX = B for X. Computes minimum-norm solution to a linear least squares problem
