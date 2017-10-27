@@ -1,4 +1,4 @@
-https://www.travis-ci.org/kaleidicassociates/lubeck.svg?branch=master
+[![Build Status](https://www.travis-ci.org/kaleidicassociates/lubeck.svg?branch=master)](https://www.travis-ci.org/kaleidicassociates/lubeck)
 
 # lubeck
 High level linear algebra library for Dlang
