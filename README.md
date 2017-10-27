@@ -1,3 +1,5 @@
+https://www.travis-ci.org/kaleidicassociates/lubeck.svg?branch=master
+
 # lubeck
 High level linear algebra library for Dlang
 
