@@ -669,7 +669,7 @@ Slice!(Contiguous, [2], BlasType!Iterator*)
     }
     auto s = svd.sigma[0 .. $ - svd.sigma.find!(a => !(a >= tolerance))[0]];
     s.each!"a = 1 / a";
-    svd.vt.pack!1.map!"a".zip(s).each!"a.a[] *= a.b";
+    svd.vt[0 .. s.length].pack!1.map!"a".zip(s).each!"a.a[] *= a.b";
     auto v = svd.vt[0 .. s.length].universal.transposed;
     auto ut = svd.u.universal.transposed[0 .. s.length];
     return v.mtimes(ut);
