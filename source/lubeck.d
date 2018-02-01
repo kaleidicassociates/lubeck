@@ -1025,3 +1025,209 @@ unittest
         assert(eigr.vectors[i].approxEqual(test[i]) ||
             eigr.vectors[i].map!"-a".approxEqual(test[i]));
 }
+
+/++
+computes LU factorization with permutation matrix.
+Params:
+    a = Matrix for factorization (in)
+    P = permutation matrix (in / out)
+Returns:
+    LU factorization matrix
++/
+auto LU_decomposition(SliceKind kind, Iterator)
+                     (Slice!(kind, [2], Iterator) a,
+                      Slice!(Contiguous, [1], lapackint*) P)
+in
+{
+    assert (a.length!0 == a.length!1, "matrix must be square");
+}
+body
+{
+    lapackint n = cast(lapackint) a.length!0;
+    lapackint info = void;
+    lapackint lda = cast(lapackint) a._stride.max(1);
+	alias T = BlasType!Iterator;
+	auto m = a.transposed.as!T.slice.universal;
+	auto ipiv = m.length.uninitSlice!lapackint;
+	for(int i = 0; i < n; ++i)
+        P[i] = i + 1;
+	
+    lapack.getrf_(n, n, m.iterator, lda, ipiv.iterator, info);
+	m = m.transposed;
+	
+	lapackint tmp;
+	//bring the ipiv to permutation matrix (standart form)
+	for(int i = 0; i < ipiv.length; ++i) {
+        if(ipiv[i] == i + 1) continue;
+        tmp = P[i];
+        P[i] = P[ipiv[i] - 1];
+        P[ipiv[i] - 1] = tmp;
+	}
+	return m;
+}
+
+///
+unittest
+{
+	auto B =
+        [ 1,  4, -3,
+         -2,  8,  5,
+          3,  4,  7 ]
+            .sliced(3, 3)
+            .as!double.slice
+            .universal;
+            
+	auto P = B.length.uninitSlice!lapackint;
+	auto U = B.LU_decomposition(P);
+	auto L = U.as!double.slice.universal;
+	auto M = uninitSlice!double(B.length!0, B.length!1);
+	
+	for(int i = 0; i < L.length; ++i) {
+        for(int j = 0; j < L.length; ++j) {
+            if(i == j) {
+                L[i][j] = 1;
+                continue;
+            }
+            if(i < j) {
+                L[i][j] = 0;
+            } else {
+                U[i][j] = 0;
+            }
+        }
+    }
+    
+	M[] = 0;
+	for(int i = 0; i < M.length; ++i) {
+        for(int j = 0; j < M.length; ++j) {
+            for(int k = 0; k < M.length; ++k) {
+                M[i][j] = M[i][j] + L[i][k] * U[k][j];
+            }
+        }
+	}
+	
+	lapackint tmp_int;
+	double tmp_double;
+	for(int i = 0; i < M.length; ++i) {
+        if(P[i] == i + 1) continue;
+        for(int j = 0; j < M.length; ++j) {
+            tmp_double = M[i][j];
+            M[i][j] = M[P[i] - 1][j];
+            M[P[i] - 1][j] = tmp_double;
+        }
+        tmp_int = P[i];
+        P[i] = P[tmp_int - 1];
+        P[tmp_int - 1] = tmp_int;
+        --i;
+	}
+	assert(M == B);
+}
+
+unittest
+{
+	auto B = [ 2,  1,  3,
+               4, -1,  3,
+              -2,  5,  5 ]
+            .sliced(3, 3)
+            .as!double.slice
+            .assumeContiguous;
+            
+	auto P = B.length.uninitSlice!lapackint;
+	auto U = B.LU_decomposition(P);
+	auto L = U.as!double.slice.universal;
+	auto M = uninitSlice!double(B.length!0, B.length!1);
+	
+	for(int i = 0; i < L.length; ++i) {
+        for(int j = 0; j < L.length; ++j) {
+            if(i == j) {
+                L[i][j] = 1;
+                continue;
+            }
+            if(i < j) {
+                L[i][j] = 0;
+            } else {
+                U[i][j] = 0;
+            }
+        }
+    }
+   
+	M[] = 0;
+	for(int i = 0; i < M.length; ++i) {
+        for(int j = 0; j < M.length; ++j) {
+            for(int k = 0; k < M.length; ++k) {
+                M[i][j] = M[i][j] + L[i][k] * U[k][j];
+            }
+        }
+	}
+	
+	lapackint tmp_int;
+	double tmp_double;
+	for(int i = 0; i < M.length; ++i) {
+        if(P[i] == i + 1) continue;
+        for(int j = 0; j < M.length; ++j) {
+            tmp_double = M[i][j];
+            M[i][j] = M[P[i] - 1][j];
+            M[P[i] - 1][j] = tmp_double;
+        }
+        tmp_int = P[i];
+        P[i] = P[tmp_int - 1];
+        P[tmp_int - 1] = tmp_int;
+        --i;
+	}
+	assert(M == B);
+}
+
+unittest
+{
+	auto B =
+        [ 3, -7, -2,  2,
+         -3,  5,  1,  0,
+          6, -4,  0, -5,
+	     -9,  5, -5, 12 ]
+            .sliced(4, 4)
+            .as!double.slice
+            .canonical;
+            
+	auto P = B.length.uninitSlice!lapackint;
+	auto U = B.LU_decomposition(P);
+	auto L = U.as!double.slice.universal;
+	auto M = uninitSlice!double(B.length!0, B.length!1);
+	
+	for(int i = 0; i < L.length; ++i) {
+        for(int j = 0; j < L.length; ++j) {
+            if(i == j) {
+                L[i][j] = 1;
+                continue;
+            }
+            if(i < j) {
+                L[i][j] = 0;
+            } else {
+                U[i][j] = 0;
+            }
+        }
+    }
+    
+	M[] = 0;
+	for(int i = 0; i < M.length; ++i) {
+        for(int j = 0; j < M.length; ++j) {
+            for(int k = 0; k < M.length; ++k) {
+                M[i][j] = M[i][j] + L[i][k] * U[k][j];
+            }
+        }
+	}
+	
+	lapackint tmp_int;
+	double tmp_double;
+	for(int i = 0; i < M.length; ++i) {
+        if(P[i] == i + 1) continue;
+        for(int j = 0; j < M.length; ++j) {
+            tmp_double = M[i][j];
+            M[i][j] = M[P[i] - 1][j];
+            M[P[i] - 1][j] = tmp_double;
+        }
+        tmp_int = P[i];
+        P[i] = P[tmp_int - 1];
+        P[tmp_int - 1] = tmp_int;
+        --i;
+	}
+	assert(M == B);
+}
