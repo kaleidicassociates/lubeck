@@ -1027,9 +1027,36 @@ unittest
 }
 
 /++
+swaps rows
+Params
+    P = permutation matrix
+Returns:
+    a = shifted matrix
++/
+void moveRows(SliceKind kind, Iterator)
+                     (Slice!(kind, [2], Iterator) a,
+                      Slice!(Contiguous, [1], lapackint*) P)
+{
+    lapackint tmp_int;
+    double tmp_double;
+    foreach(i;0..a.length) {
+        if(P[i] == i + 1) continue;
+        foreach(j;0..a.length) {
+            tmp_double = a[i][j];
+            a[i][j] = a[P[i] - 1][j];
+            a[P[i] - 1][j] = tmp_double;
+        }
+        tmp_int = P[i];
+        P[i] = P[tmp_int - 1];
+        P[tmp_int - 1] = tmp_int;
+        --i;
+    }
+}
+
+/++
 computes LU factorization with permutation matrix.
 Params:
-    a = Matrix for factorization
+    a = matrix for factorization
 Returns:
     LU factorization matrix
     P = permutation matrix
@@ -1043,29 +1070,29 @@ in
 }
 body
 {
-	alias T = BlasType!Iterator;
-	auto m = a.transposed.as!T.slice.canonical;
-	auto ipiv = m.length.uninitSlice!lapackint;
-	for(int i = 0; i < P.length; ++i)
-        P[i] = i + 1;
-	
+    alias T = BlasType!Iterator;
+    auto m = a.transposed.as!T.slice.canonical;
+    auto ipiv = m.length.uninitSlice!lapackint;
+    foreach(i;0..P.length)
+        P[i] = cast(lapackint) i + 1;
+
     getrf(m, ipiv);
-	
-	lapackint tmp;
-	//bring the ipiv to permutation matrix (standart form)
-    for(int i = 0; i < ipiv.length; ++i) {
+
+    lapackint tmp;
+    //bring the ipiv to permutation matrix (standart form)
+    foreach(i;0..ipiv.length) {
         if(ipiv[i] == i + 1) continue;
         tmp = P[i];
         P[i] = P[ipiv[i] - 1];
         P[ipiv[i] - 1] = tmp;
     }
-	return m.as!T.slice.universal.transposed;
+    return m.as!T.slice.universal.transposed;
 }
 
 ///
 unittest
 {
-	auto B =
+    auto B =
         [ 1,  4, -3,
          -2,  8,  5,
           3,  4,  7 ]
@@ -1073,105 +1100,174 @@ unittest
             .as!double.slice
             .universal;
             
-	auto P = B.length.uninitSlice!lapackint;
-	auto U = B.lu(P);
-	auto L = U.as!double.slice.universal;
-	auto LU = uninitSlice!double(B.length!0, B.length!1);
+    auto P = B.length.uninitSlice!lapackint;
+    auto U = B.lu(P);
+    auto L = U.as!double.slice.universal;
+    auto LU = uninitSlice!double(B.length!0, B.length!1);
     
-	import mir.ndslice.algorithm: each, eachUploPair;
+    import mir.ndslice.algorithm: each, eachUploPair;
     L.eachUploPair!"a = 0";
     U.eachUploPair!"b = 0";
     L.diagonal[] = 1;
-	LU = mtimes(L, U);
-    
-	lapackint tmp_int;
-	double tmp_double;
-	for(int i = 0; i < LU.length; ++i) {
-        if(P[i] == i + 1) continue;
-        for(int j = 0; j < LU.length; ++j) {
-            tmp_double = LU[i][j];
-            LU[i][j] = LU[P[i] - 1][j];
-            LU[P[i] - 1][j] = tmp_double;
-        }
-        tmp_int = P[i];
-        P[i] = P[tmp_int - 1];
-        P[tmp_int - 1] = tmp_int;
-        --i;
-	}
-	assert(LU == B);
+    LU = mtimes(L, U);
+    moveRows(LU, P);
+
+    assert(LU == B);
 }
 
 unittest
 {
-	auto B = [ 2,  1,  3,
+    auto B = [ 2,  1,  3,
                4, -1,  3,
               -2,  5,  5 ]
             .sliced(3, 3)
             .as!double.slice;
             
-	auto P = B.length.uninitSlice!lapackint;
-	auto U = B.lu(P);
-	auto L = U.as!double.slice.universal;
-	auto LU = uninitSlice!double(B.length!0, B.length!1);
+    auto P = B.length.uninitSlice!lapackint;
+    auto U = B.lu(P);
+    auto L = U.as!double.slice.universal;
+    auto LU = uninitSlice!double(B.length!0, B.length!1);
     
-	import mir.ndslice.algorithm: each, eachUploPair;
+    import mir.ndslice.algorithm: each, eachUploPair;
     L.eachUploPair!"a = 0";
     U.eachUploPair!"b = 0";
     L.diagonal[] = 1;
-	LU = mtimes(L, U);
-    
-	lapackint tmp_int;
-	double tmp_double;
-	for(int i = 0; i < LU.length; ++i) {
-        if(P[i] == i + 1) continue;
-        for(int j = 0; j < LU.length; ++j) {
-            tmp_double = LU[i][j];
-            LU[i][j] = LU[P[i] - 1][j];
-            LU[P[i] - 1][j] = tmp_double;
-        }
-        tmp_int = P[i];
-        P[i] = P[tmp_int - 1];
-        P[tmp_int - 1] = tmp_int;
-        --i;
-	}
-	assert(LU == B);
+    LU = mtimes(L, U);
+    moveRows(LU, P);
+
+    assert(LU == B);
 }
 
 unittest
 {
-	auto B =
+    auto B =
         [ 3, -7, -2,  2,
          -3,  5,  1,  0,
           6, -4,  0, -5,
-	     -9,  5, -5, 12 ]
+         -9,  5, -5, 12 ]
             .sliced(4, 4)
             .as!double.slice
             .canonical;
             
-	auto P = B.length.uninitSlice!lapackint;
-	auto U = B.lu(P);
-	auto L = U.as!double.slice.universal;
-	auto LU = uninitSlice!double(B.length!0, B.length!1);
+    auto P = B.length.uninitSlice!lapackint;
+    auto U = B.lu(P);
+    auto L = U.as!double.slice.universal;
+    auto LU = uninitSlice!double(B.length!0, B.length!1);
     
-	import mir.ndslice.algorithm: each, eachUploPair;
+    import mir.ndslice.algorithm: each, eachUploPair;
     L.eachUploPair!"a = 0";
     U.eachUploPair!"b = 0";
     L.diagonal[] = 1;
-	LU = mtimes(L, U);
+    LU = mtimes(L, U);
+    moveRows(LU, P);
     
-	lapackint tmp_int;
-	double tmp_double;
-	for(int i = 0; i < LU.length; ++i) {
-        if(P[i] == i + 1) continue;
-        for(int j = 0; j < LU.length; ++j) {
-            tmp_double = LU[i][j];
-            LU[i][j] = LU[P[i] - 1][j];
-            LU[P[i] - 1][j] = tmp_double;
-        }
-        tmp_int = P[i];
-        P[i] = P[tmp_int - 1];
-        P[tmp_int - 1] = tmp_int;
-        --i;
-	}
-	assert(LU == B);
+    assert(LU == B);
+}
+
+/++
+Matrix comprasion
+Params:
+    a = first cmp matrix
+    b = second cmp matrix
+returns:
+    true, if matrices are equal, else false
++/
+bool cmp(SliceKind kindA, IteratorA, SliceKind kindB, IteratorB)
+        (Slice!(kindA, [2], IteratorA) a,
+         Slice!(kindB, [2], IteratorB) b)
+{
+    import std.math: pow, abs;
+    if((a.length!0 != b.length!0) || (a.length!1 != b.length!1))
+        return false;
+    foreach(i;0..a.length!0)
+        foreach(j;0..a.length!1)
+            if(abs(a[i][j] - b[i][j]) > pow(0.1, 12))
+                return false;
+    return true;
+}
+
+/++
+QR decomposition
+Params:
+    a = initial matrix
+returns:
+    R = R part decomposition
+    Q = Q part decomposition
++/
+void qr(SliceKind kindA, IteratorA, SliceKind kindR, IteratorR, SliceKind kindQ, IteratorQ)
+       (Slice!(kindA, [2], IteratorA) a,
+        ref Slice!(kindR, [2], IteratorR) R,
+        ref Slice!(kindQ, [2], IteratorQ) Q)
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+}
+body
+{
+    alias T = BlasType!IteratorA;
+    auto m = a.as!T.slice.canonical;
+    int min_size = cast(int) min(a.length!0, a.length!1);
+    auto tau = min_size.uninitSlice!T;
+    auto work = [m.length!1 * 64].uninitSlice!T;
+
+    geqrf!T(m, tau, work);
+    R = m.slice.universal;
+
+    import mir.ndslice.algorithm: each, eachUploPair;
+    R = R.transposed;
+    R.eachUploPair!"b = 0";
+    orgqr(m, tau, work);
+    Q = m.slice.universal.transposed;
+}
+
+///
+unittest
+{
+    auto A =
+            [ 1,  1,  0,
+              1,  0,  1,
+              0,  1,  1 ]
+              .sliced(3, 3)
+              .as!double.slice;
+    auto Q = uninitSlice!double(A.length!0, A.length!1).universal;
+    auto R = uninitSlice!double(A.length!0, A.length!1).universal;
+    A.qr(R, Q);
+    auto res = mtimes(Q, R).universal;
+    res = res.transposed;
+
+    assert(cmp(A, res));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  0,  5,
+              1,  0,  1,  4,
+              0,  1,  1,  2,
+              2,  3,  5,  1 ]
+              .sliced(4, 4)
+              .as!double.slice;
+    auto Q = uninitSlice!double(A.length!0, A.length!1).universal;
+    auto R = uninitSlice!double(A.length!0, A.length!1).universal;
+    A.qr(R, Q);
+    auto res = mtimes(Q, R).universal;
+    res = res.transposed;
+
+    assert(cmp(A, res));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,
+              1,  0 ]
+              .sliced(2, 2)
+              .as!double.slice;
+    auto Q = uninitSlice!double(A.length!0, A.length!1).universal;
+    auto R = uninitSlice!double(A.length!0, A.length!1).universal;
+    A.qr(R, Q);
+    auto res = mtimes(Q, R).universal;
+    res = res.transposed;
+
+    assert(cmp(A, res));
 }
