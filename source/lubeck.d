@@ -1271,3 +1271,41 @@ unittest
 
     assert(cmp(A, res));
 }
+
+auto cholesky(SliceKind kind, Iterator)
+             (Slice!(kind, [2], Iterator) a,
+              char uplo)
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+}
+body
+{
+    alias T = BlasType!Iterator;
+    auto m = a.as!T.slice.canonical;
+
+    potrf!T(m, uplo);
+    return m;
+}
+
+unittest
+{
+    auto A =
+            [ 6,  15,  55,
+             15,  55, 255,
+             55, 225, 979 ]
+             .sliced(3, 3)
+             .as!double.slice
+             .universal;
+
+    import mir.ndslice.algorithm: each, eachUploPair;
+    auto C = A.cholesky('U');
+    C.eachUploPair!"a = 0";
+    auto B = A.cholesky('L');
+    B.eachUploPair!"b = 0";
+    
+    writeln(B);
+    writeln(C);
+    writeln(mtimes(B.transposed, B));
+    writeln(mtimes(C, C.transposed));
+}
