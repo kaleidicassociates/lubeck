@@ -20,6 +20,34 @@ if A is not a square matrix.
  - `det`/`detSymmetric` - General/symmetric matrix determinant.
  - `eigSymmetric` - Eigenvalues and eigenvectors of symmetric matrix.
 
+## Example
+
+```d
+/+dub.sdl:
+dependency "lubeck" version="~>0.0"
+dependency "mir-algorithm" version="~>0.7"
+libs "lapack" "blas"
+
++/
+import std.stdio;
+import mir.ndslice: magic, repeat, as, slice;
+import lubeck: mtimes;
+
+void main()
+{
+    auto n = 5;
+    // Magic Square
+    auto matrix = n.magic.as!double.slice;
+    // [1 1 1 1 1]
+    auto vec = 1.repeat(n).as!double.slice;
+    // Uses CBLAS for multiplication
+    matrix.mtimes(vec).writeln;
+    matrix.mtimes(matrix).writeln;
+}
+```
+
+[![Open on run.dlang.io](https://img.shields.io/badge/run.dlang.io-open-blue.svg)](https://run.dlang.io/is/vzhvo5)
+
 ### Related packages
  - [mir-algorithm](https://github.com/libmir/mir-algorithm)
  - [mir-lapack](https://github.com/libmir/mir-lapack)
