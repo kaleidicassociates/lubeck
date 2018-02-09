@@ -1026,44 +1026,47 @@ unittest
             eigr.vectors[i].map!"-a".approxEqual(test[i]));
 }
 
+version(unittest)
+{
 /++
-swaps rows
+Swaps rows
 Params
     P = permutation matrix
 Returns:
     a = shifted matrix
 +/
-void moveRows(SliceKind kind, Iterator)
-                     (Slice!(kind, [2], Iterator) a,
-                      Slice!(Contiguous, [1], lapackint*) P)
-{
-    lapackint tmp_int;
-    double tmp_double;
-    foreach(i;0..a.length) {
-        if(P[i] == i + 1) continue;
-        foreach(j;0..a.length) {
-            tmp_double = a[i][j];
-            a[i][j] = a[P[i] - 1][j];
-            a[P[i] - 1][j] = tmp_double;
+    void moveRows(SliceKind kind, Iterator)
+                        (Slice!(kind, [2], Iterator) a,
+                        Slice!(Contiguous, [1], lapackint*) ipiv)
+    {
+        import mir.ndslice.algorithm: each;
+        lapackint tmp_int;
+        double tmp_double;
+        for(int i = cast(int) a.length - 1; i >= 0; --i)
+        {
+            if(ipiv[i] == i + 1)
+                continue;
+            each!swap(a[i], a[ipiv[i] - 1]);
         }
-        tmp_int = P[i];
-        P[i] = P[tmp_int - 1];
-        P[tmp_int - 1] = tmp_int;
-        --i;
     }
 }
 
+///
+struct LUResult(T)
+{
+    ///Matrix in witch upper triangle is transposed L part of decomp, lower triangle is transposed U part
+    Slice!(Canonical, [2], T*) lut;
+    ///Pivot points
+    Slice!(Contiguous, [1], lapackint*) ipiv;
+}
+
 /++
-computes LU factorization with permutation matrix.
+Computes LU factorization with pivot indices.
 Params:
-    a = matrix for factorization
-Returns:
-    LU factorization matrix
-    P = permutation matrix
+    a = input 'N x N' matrix for factorization.
+Returns: $(LREF LUResalt)
 +/
-auto lu(SliceKind kind, Iterator)
-                     (Slice!(kind, [2], Iterator) a,
-                      Slice!(Contiguous, [1], lapackint*) P)
+auto lu(SliceKind kind, Iterator)(Slice!(kind, [2], Iterator) a)
 in
 {
     assert (a.length!0 == a.length!1, "matrix must be square");
@@ -1071,22 +1074,10 @@ in
 body
 {
     alias T = BlasType!Iterator;
-    auto m = a.transposed.as!T.slice.canonical;
+    auto m = a.as!T.slice.canonical;
     auto ipiv = m.length.uninitSlice!lapackint;
-    foreach(i;0..P.length)
-        P[i] = cast(lapackint) i + 1;
-
     getrf(m, ipiv);
-
-    lapackint tmp;
-    //bring the ipiv to permutation matrix (standart form)
-    foreach(i;0..ipiv.length) {
-        if(ipiv[i] == i + 1) continue;
-        tmp = P[i];
-        P[i] = P[ipiv[i] - 1];
-        P[ipiv[i] - 1] = tmp;
-    }
-    return m.as!T.slice.universal.transposed;
+    return LUResult!T(m, ipiv);
 }
 
 ///
@@ -1099,20 +1090,19 @@ unittest
             .sliced(3, 3)
             .as!double.slice
             .universal;
-            
-    auto P = B.length.uninitSlice!lapackint;
-    auto U = B.lu(P);
-    auto L = U.as!double.slice.universal;
-    auto LU = uninitSlice!double(B.length!0, B.length!1);
+    auto LU = B.lu();
+    auto L = LU.lut.slice.universal.transposed;
+    auto U = LU.lut.slice.universal.transposed;
     
-    import mir.ndslice.algorithm: each, eachUploPair;
-    L.eachUploPair!"a = 0";
+    import mir.ndslice.algorithm: eachUploPair;
     U.eachUploPair!"b = 0";
+    L.eachUploPair!"a = 0";
     L.diagonal[] = 1;
-    LU = mtimes(L, U);
-    moveRows(LU, P);
+    auto res = mtimes(L,U).slice.universal;
+    moveRows(res, LU.ipiv);
+    res = res.transposed;
 
-    assert(LU == B);
+    assert(res == B);
 }
 
 unittest
@@ -1122,20 +1112,19 @@ unittest
               -2,  5,  5 ]
             .sliced(3, 3)
             .as!double.slice;
-            
-    auto P = B.length.uninitSlice!lapackint;
-    auto U = B.lu(P);
-    auto L = U.as!double.slice.universal;
-    auto LU = uninitSlice!double(B.length!0, B.length!1);
+    auto LU = B.lu();
+    auto L = LU.lut.slice.universal.transposed;
+    auto U = LU.lut.slice.universal.transposed;
     
-    import mir.ndslice.algorithm: each, eachUploPair;
-    L.eachUploPair!"a = 0";
+    import mir.ndslice.algorithm: eachUploPair;
     U.eachUploPair!"b = 0";
+    L.eachUploPair!"a = 0";
     L.diagonal[] = 1;
-    LU = mtimes(L, U);
-    moveRows(LU, P);
+    auto res = mtimes(L,U).slice.universal;
+    moveRows(res, LU.ipiv);
+    res = res.transposed;
 
-    assert(LU == B);
+    assert(res == B);
 }
 
 unittest
@@ -1148,76 +1137,153 @@ unittest
             .sliced(4, 4)
             .as!double.slice
             .canonical;
-            
-    auto P = B.length.uninitSlice!lapackint;
-    auto U = B.lu(P);
-    auto L = U.as!double.slice.universal;
-    auto LU = uninitSlice!double(B.length!0, B.length!1);
+    auto LU = B.lu();
+    auto L = LU.lut.slice.universal.transposed;
+    auto U = LU.lut.slice.universal.transposed;
     
-    import mir.ndslice.algorithm: each, eachUploPair;
-    L.eachUploPair!"a = 0";
+    import mir.ndslice.algorithm: eachUploPair;
     U.eachUploPair!"b = 0";
+    L.eachUploPair!"a = 0";
     L.diagonal[] = 1;
-    LU = mtimes(L, U);
-    moveRows(LU, P);
-    
-    assert(LU == B);
+    auto res = mtimes(L,U).slice.universal;
+    moveRows(res, LU.ipiv);
+    res = res.transposed;
+
+    assert(res == B);
 }
 
-/++
-Matrix comprasion
-Params:
-    a = first cmp matrix
-    b = second cmp matrix
-returns:
-    true, if matrices are equal, else false
-+/
-bool cmp(SliceKind kindA, IteratorA, SliceKind kindB, IteratorB)
-        (Slice!(kindA, [2], IteratorA) a,
-         Slice!(kindB, [2], IteratorB) b)
+///
+struct LDLResult(T)
 {
-    import std.math: pow, abs;
-    if((a.length!0 != b.length!0) || (a.length!1 != b.length!1))
-        return false;
-    foreach(i;0..a.length!0)
-        foreach(j;0..a.length!1)
-            if(abs(a[i][j] - b[i][j]) > pow(0.1, 12))
-                return false;
-    return true;
+    ///Matrix in witch upper triangle is LT part of decomp, diagonal is D part
+    Slice!(Canonical, [2], T*) ldt;
+    ///Pivot points
+    Slice!(Contiguous, [1], lapackint*) ipiv;
 }
 
-/++
-QR decomposition
-Params:
-    a = initial matrix
-returns:
-    R = R part decomposition
-    Q = Q part decomposition
-+/
-void qr(SliceKind kindA, IteratorA, SliceKind kindR, IteratorR, SliceKind kindQ, IteratorQ)
-       (Slice!(kindA, [2], IteratorA) a,
-        ref Slice!(kindR, [2], IteratorR) R,
-        ref Slice!(kindQ, [2], IteratorQ) Q)
+auto LDL_decomposition(SliceKind kind, Iterator)
+                      (Slice!(kind, [2], Iterator) a)
 in
 {
     assert(a.length!0 == a.length!1, "matrix must be squared");
 }
 body
 {
-    alias T = BlasType!IteratorA;
+    import mir.ndslice.algorithm: eachUploPair;
+    alias T = BlasType!Iterator;
+    auto m = a.as!T.slice.canonical;
+    auto ipiv = m.length.uninitSlice!lapackint;
+    auto work = [m.length * 3].uninitSlice!T;
+    sytrf!T(m, ipiv, work);
+    m.eachUploPair!"b = 0";
+
+    return LDLResult!T(m, ipiv);
+}
+
+///
+unittest
+{
+    import mir.ndslice.algorithm: eachUploPair;
+    auto A =
+        [ 9, -1,  2,
+         -1,  8, -5,
+          2, -5,  7 ]
+            .sliced(3, 3)
+            .as!double.slice
+            .canonical;
+
+    auto LDL = A.LDL_decomposition;
+    auto Lt = LDL.ldt.slice;
+    auto D = LDL.ldt.slice;
+    Lt.diagonal[] = 1;
+    auto L = Lt.transposed;
+    D.eachUploPair!"a = 0";
+
+    assert(mtimes(mtimes(L, D), Lt) == A);
+}
+
+unittest
+{
+    import mir.ndslice.algorithm: eachUploPair;
+    auto A =
+        [10, 20, 30,
+         20, 45, 80,
+         30, 80, 171 ]
+            .sliced(3, 3)
+            .as!double.slice
+            .universal;
+
+    auto LDL = A.LDL_decomposition;
+    auto D = LDL.ldt.slice;
+    D.eachUploPair!"a = 0";
+    auto detA = cast(double) det(A);
+    auto detD = cast(double) det(D);
+
+    assert(detA == detA);
+}
+
+
+unittest
+{
+    import mir.ndslice.algorithm: eachUploPair;
+    auto A =
+        [9,  5, -2,
+         5,  8,  2,
+        -2,  2,  6 ]
+            .sliced(3, 3)
+            .as!double.slice
+            .universal;
+
+    auto LDL = A.LDL_decomposition;
+    auto D = LDL.ldt.slice;
+    D.eachUploPair!"a = 0";
+    auto detA = cast(double) det(A);
+    auto detD = cast(double) det(D);
+
+    assert(detA == detD);
+}
+
+///
+struct QRResult(T)
+{
+    ///Q part transposed
+    Slice!(Canonical, [2], T*) qt;
+    ///R part transposed
+    Slice!(Canonical, [2], T*) rt;
+    ///Matrix returned from lapack, when matrix used from computes Q part, and upper triangle is R part
+    Slice!(Canonical, [2], T*) qrt;
+    ///The scalar factors of the elementary reflectors
+    Slice!(Contiguous, [1], T*) tau;
+}
+
+/++
+Computes QR decomposition
+Params:
+    a = initial matrix
+Returns: $(LREF QRResult)
++/
+auto qr(SliceKind kind, Iterator)
+       (Slice!(kind, [2], Iterator) a)
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+}
+body
+{
+    alias T = BlasType!Iterator;
     auto m = a.as!T.slice.canonical;
     int min_size = cast(int) min(a.length!0, a.length!1);
     auto tau = min_size.uninitSlice!T;
     auto work = [m.length!1 * 64].uninitSlice!T;
 
     geqrf!T(m, tau, work);
-    R = m.slice.universal;
+    auto R = m.slice.canonical;
+    auto Q = m.slice.canonical;
 
     import mir.ndslice.algorithm: each, eachUploPair;
-    R = R.transposed;
-    R.eachUploPair!"b = 0";
-    orgqr(m, tau, work);
-    Q = m.slice.universal.transposed;
+    R.eachUploPair!"a = 0";
+    orgqr(Q, tau, work);
+    return QRResult!T(Q, R, m, tau);
 }
 
 ///
@@ -1229,13 +1295,12 @@ unittest
               0,  1,  1 ]
               .sliced(3, 3)
               .as!double.slice;
-    auto Q = uninitSlice!double(A.length!0, A.length!1).universal;
-    auto R = uninitSlice!double(A.length!0, A.length!1).universal;
-    A.qr(R, Q);
-    auto res = mtimes(Q, R).universal;
+    auto QR = A.qr;
+    auto res = mtimes(QR.qt.transposed, QR.rt.transposed).universal;
     res = res.transposed;
 
-    assert(cmp(A, res));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
 }
 
 unittest
@@ -1247,13 +1312,12 @@ unittest
               2,  3,  5,  1 ]
               .sliced(4, 4)
               .as!double.slice;
-    auto Q = uninitSlice!double(A.length!0, A.length!1).universal;
-    auto R = uninitSlice!double(A.length!0, A.length!1).universal;
-    A.qr(R, Q);
-    auto res = mtimes(Q, R).universal;
+    auto QR = A.qr;
+    auto res = mtimes(QR.qt.transposed, QR.rt.transposed).universal;
     res = res.transposed;
 
-    assert(cmp(A, res));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
 }
 
 unittest
@@ -1263,18 +1327,25 @@ unittest
               1,  0 ]
               .sliced(2, 2)
               .as!double.slice;
-    auto Q = uninitSlice!double(A.length!0, A.length!1).universal;
-    auto R = uninitSlice!double(A.length!0, A.length!1).universal;
-    A.qr(R, Q);
-    auto res = mtimes(Q, R).universal;
+    auto QR = A.qr;
+    auto res = mtimes(QR.qt.transposed, QR.rt.transposed).universal;
     res = res.transposed;
 
-    assert(cmp(A, res));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
 }
 
+/++
+Computs Cholesky decomposition
+Params:
+    a = n x n matrix
+    Uplo = if uplo is Upper, then program return upper triangle, else lower
+Returns:
+    Matrix in witch upper or lower triangle is cholesky decomp, watch Uplo
++/
 auto cholesky(SliceKind kind, Iterator)
              (Slice!(kind, [2], Iterator) a,
-              char uplo)
+              Uplo uplo)
 in
 {
     assert(a.length!0 == a.length!1, "matrix must be squared");
@@ -1288,24 +1359,62 @@ body
     return m;
 }
 
+///
 unittest
 {
     auto A =
             [ 6,  15,  55,
-             15,  55, 255,
+             15,  55, 225,
              55, 225, 979 ]
              .sliced(3, 3)
              .as!double.slice
              .universal;
 
     import mir.ndslice.algorithm: each, eachUploPair;
-    auto C = A.cholesky('U');
-    C.eachUploPair!"a = 0";
-    auto B = A.cholesky('L');
-    B.eachUploPair!"b = 0";
+    auto C = A.cholesky(Uplo.Lower);
+    C.eachUploPair!"b = 0";
+    auto B = A.cholesky(Uplo.Upper);
+    B.eachUploPair!"a = 0";
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(B, C), A));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  3,
+              1,  5,  5,
+              3,  5, 19 ]
+             .sliced(3, 3)
+             .as!double.slice
+             .universal;
+
+    import mir.ndslice.algorithm: each, eachUploPair;
+    auto C = A.cholesky(Uplo.Lower);
+    C.eachUploPair!"b = 0";
+    auto B = A.cholesky(Uplo.Upper);
+    B.eachUploPair!"a = 0";
     
-    writeln(B);
-    writeln(C);
-    writeln(mtimes(B.transposed, B));
-    writeln(mtimes(C, C.transposed));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(B, C), A));
+}
+
+unittest
+{
+    auto A =
+           [ 25, 15, -5,
+             15, 18,  0,
+             -5,  0, 11 ]
+             .sliced(3, 3)
+             .as!double.slice;
+
+    import mir.ndslice.algorithm: each, eachUploPair;
+    auto C = A.cholesky(Uplo.Lower);
+    C.eachUploPair!"b = 0";
+    auto B = A.cholesky(Uplo.Upper);
+    B.eachUploPair!"a = 0";
+    
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(B, C), A));
 }
