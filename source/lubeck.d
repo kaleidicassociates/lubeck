@@ -1122,18 +1122,20 @@ unittest
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(B, A));
 }
 
-///
+///LUResult consist lu factorization.
 struct LUResult(T)
 {
-    ///Matrix in witch lower triangular is L part of decomposition (diagonal elements of L are not stored), upper triangular is U part of decomposition.
-    Slice!(Canonical, [2], T*) lu;
-    ///The pivot indices, for 1 <= i <= min(M,N), row i of the matrix was interchanged with row ipiv(i).
+    ///Matrix in witch lower triangular is L part of factorization
+    ///(diagonal elements of L are not stored), upper triangular
+    ///is U part of factorization.
+    Slice!(Canonical, [2], T*) lut;
+    ///The pivot indices, for 1 <= i <= min(M,N), row i of the matrix
+    ///was interchanged with row ipiv(i).
     Slice!(Contiguous, [1], lapackint*) ipiv;
-    ///L part of the decomposition.
+    ///L part of the factorization.
     auto l()
     {
-        auto l = uninitSlice!T(lu.length!0, min(lu.length!0, lu.length!1));
-        l[] = 0;
+        auto l = uninitSlice!T(lut.length!1, min(lut.length!0, lut.length!1));
         foreach(i;0..l.length!0)
         {
             foreach(j;0..min(i + 1, l.length!1))
@@ -1141,63 +1143,196 @@ struct LUResult(T)
                 if(i == j)
                     l[i][j] = 1;
                 else
-                    l[i][j] = lu[i][j];
+                    l[i][j] = lut[j][i];
             }
         }
         return l;
     }
-    ///U part of the decomposition.
+    ///U part of the factorization.
     auto u()
     {
-        auto u = uninitSlice!T(min(lu.length!0, lu.length!1), lu.length!1);
-        u[] = 0;
+        auto u = uninitSlice!T(min(lut.length!0, lut.length!1), lut.length!0);
         foreach(i;0..u.length!0)
             foreach(j;i..u.length!1)
-                u[i][j] = lu[i][j];
+                u[i][j] = lut[j][i];
         return u;
     }
 }
 
 /++
-Computes LU factorization of a general 'M x N' matrix 'A' using partial pivoting with row interchanges.
+Computes LU factorization of a general 'M x N' matrix 'A' using partial
+pivoting with row interchanges.
 The factorization has the form:
     A = P * L * U
-Where P is a permutation matrix, L is lower triangular with unit diagonal elements (lower trapezoidal if m > n), and U is upper triangular (upper trapezoidal if m < n).
+Where P is a permutation matrix, L is lower triangular with unit
+diagonal elements (lower trapezoidal if m > n), and U is upper
+triangular (upper trapezoidal if m < n).
 Params:
     a = input 'M x N' matrix for factorization.
 Returns: $(LREF LUResalt)
 +/
-auto lu(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
-        SliceKind kind, Iterator)
-       (Slice!(kind, [2], Iterator) a)
+auto luDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+              SliceKind kind, Iterator)
+             (Slice!(kind, [2], Iterator) a)
 {
     alias T = BlasType!Iterator;
-    static if(allowDestroy && kind != Universal && is(Iterator == T*))
-        alias m = a.canonical;
-    else
-        auto m = a.transposed.as!T.slice.canonical;
-    auto ipiv = uninitSlice!lapackint(min(m.length!0, m.length!1));
+    auto ipiv = uninitSlice!lapackint(min(a.length!0, a.length!1));
+    auto m = a.transposed.as!T.slice.canonical;
     getrf(m, ipiv);
-    return LUResult!T(m.transposed.as!T.slice.canonical, ipiv);
+
+    return LUResult!T(m, ipiv);
 }
+
+/++
+Solves a system of linear equations
+    \A * X = B or A**T * X = B
+with a general 'N x N' matrix 'A' using the LU factorization computed by luDecomp.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    lu = factorization of matrix 'A', A = P * L * U.
+    transpose = Specifies the form of the system of equations:
+              = 'NoTrans': A * X = B (No transpose)
+              = 'Trans': A**T * X = B (Transpose)
+              = 'ConjTrans': A**T * X = B (Conjugate transpose = Transpose)
+    b = the right hand side matrix B.
+Returns:
+    Return solve of the system linear equations.
++/
+auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+           T, SliceKind kind, size_t[] n, Iterator)
+          (LUResult!(T) lu,
+           Slice!(kind, n, Iterator) b,
+           Transpose transpose
+           )
+in
+{
+    assert(lu.lut.length!0 == lu.lut.length!1, "matrix must be squared");
+    assert(lu.ipiv.length == lu.lut.length, "size ipiv must be equally num rows a");
+    assert(lu.lut.length == b.length!0, "num rows b must be equally num columns a");
+}
+body
+{
+    if(allowDestroy && is(Iterator == T*) && kind == Canonical && b._stride!0 == 1)
+    {
+        getrs!T(lu.lut, b, lu.ipiv, transpose);
+        return b.universal;
+    }
+    else
+    {
+        auto m = b.as!T.slice.canonical;
+        getrs!T(lu.lut, m, lu.ipiv, transpose);
+        return m.transposed;
+    }
+}
+
 
 ///
 unittest
 {
-    
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
     auto B =
-        [ 1,  4, -3,  2,
-         -2,  8,  5,  4,
-          3,  4,  7,  6 ]
-            .sliced(3, 4)
+        [ 1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto C = B.slice;
+
+    auto LU = A.luDecomp();
+    auto m = solve!(Yes.allowDestroy)(LU, B, Transpose.NoTrans);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto B = [ 1,  1,  1,  1,  1 ].sliced(5, 1).as!double.slice.canonical;
+    
+    auto C = B.slice;
+
+    auto LU = A.luDecomp();
+    auto m = solve!(Yes.allowDestroy)(LU, B, Transpose.NoTrans);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
+}
+
+unittest
+{
+    auto A =
+        [ 11,  14, -31,  53,  62,
+         -92,  83,  52,  74,  83,
+          31,  45,  73,  96,  17,
+          23,  14,  65,  35,  26,
+          62,  28,  34,  51,  25 ]
+            .sliced(5, 5)
             .as!double.slice
             .universal;
+    auto B =
+        [ 1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto C = B.slice;
 
-    auto LU = B.lu();
-    auto res = mtimes(LU.l, LU.u);
-    moveRows(res, LU.ipiv);
+    auto LU = luDecomp(A.transposed);
+    auto m = solve!(Yes.allowDestroy)(LU, B, Transpose.Trans);
 
-    assert(res == B);
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B));
+}
+
+unittest
+{
+    auto A =
+        [ 54,  93,  14,  44,  33,
+          51,  85,  28,  81,  75,
+          89,  17,  15,  44,  58,
+          75,  80,  18,  35,  14,
+          21,  48,  72,  21,  88 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .universal;
+    auto B =
+        [ 1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1,
+          1,  1,  1,  1,  1 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+
+    auto LU = luDecomp(A);
+    auto m = solve(LU, B, Transpose.NoTrans);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B));
 }
 
 unittest
@@ -1211,7 +1346,7 @@ unittest
             .sliced(4, 3)
             .as!double.slice;
 
-    auto LU = B.lu();
+    auto LU = B.luDecomp();
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
@@ -1229,7 +1364,7 @@ unittest
             .as!double.slice
             .canonical;
 
-    auto LU = B.lu();
+    auto LU = B.luDecomp!(Yes.allowDestroy)();
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
