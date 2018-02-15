@@ -1178,11 +1178,12 @@ auto luDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
     alias T = BlasType!Iterator;
     auto ipiv = uninitSlice!lapackint(min(a.length!0, a.length!1));
 
-    auto b = a.transposed.assumeCanonical;
-    if(allowDestroy && b._stride!1 == 1 && b._stride!0 != 1)
+    auto b = a.transposed;
+    if(allowDestroy && b._stride!1 == 1)
     {
-        getrf(b, ipiv);
-        return LUResult!T(b, ipiv);
+        auto m = b.assumeCanonical;
+        getrf(m, ipiv);
+        return LUResult!T(m, ipiv);
     }
     else
     {
