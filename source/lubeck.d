@@ -1200,10 +1200,6 @@ with a general 'N x N' matrix 'A' using the LU factorization computed by luDecom
 Params:
     allowDestroy = flag to delete the source matrix.
     lu = factorization of matrix 'A', A = P * L * U.
-    transpose = Specifies the form of the system of equations:
-              = 'NoTrans': A * X = B (No transpose)
-              = 'Trans': A**T * X = B (Transpose)
-              = 'ConjTrans': A**T * X = B (Conjugate transpose = Transpose)
     b = the right hand side matrix B.
 Returns:
     Return solve of the system linear equations.
@@ -1212,29 +1208,34 @@ auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
            T, SliceKind kind, size_t[] n, Iterator)
           (LUResult!(T) lu,
            Slice!(kind, n, Iterator) b,
-           Transpose transpose
+           char trans = 'N'
            )
 in
 {
     assert(lu.lut.length!0 == lu.lut.length!1, "matrix must be squared");
     assert(lu.ipiv.length == lu.lut.length, "size ipiv must be equally num rows a");
-    assert(lu.lut.length == b.length!0, "num rows b must be equally num columns a");
 }
 body
 {
-    if(allowDestroy && is(Iterator == T*) && kind == Canonical && b._stride!0 == 1)
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    if(allowDestroy && k._stride!1 == 1)
     {
-        getrs!T(lu.lut, b, lu.ipiv, transpose);
-        return b.universal;
+        auto m = k.assumeCanonical;
+        getrs!T(lu.lut, m, lu.ipiv, trans);
+        return m.transposed;
     }
     else
     {
-        auto m = b.as!T.slice.canonical;
-        getrs!T(lu.lut, m, lu.ipiv, transpose);
+        auto m = k.as!T.slice.canonical;
+        getrs!T(lu.lut, m, lu.ipiv, trans);
         return m.transposed;
     }
 }
-
 
 ///
 unittest
@@ -1256,11 +1257,11 @@ unittest
           1,  1,  1,  1,  1 ]
             .sliced(5, 5)
             .as!double.slice
-            .canonical;
+            .universal;
     auto C = B.slice;
 
     auto LU = A.luDecomp();
-    auto m = solve!(Yes.allowDestroy)(LU, B, Transpose.NoTrans);
+    auto m = solve!(Yes.allowDestroy)(LU, B.transposed);
 
     import mir.ndslice.algorithm: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
@@ -1277,15 +1278,35 @@ unittest
             .sliced(5, 5)
             .as!double.slice
             .canonical;
-    auto B = [ 1,  1,  1,  1,  1 ].sliced(5, 1).as!double.slice.canonical;
-    
-    auto C = B.slice;
+    auto B = [ 1,  1,  1,  1,  1 ].sliced(5).as!double.slice;
+    auto C = B.slice.sliced(5, 1);
 
     auto LU = A.luDecomp();
-    auto m = solve!(Yes.allowDestroy)(LU, B, Transpose.NoTrans);
+    auto m = solve!(Yes.allowDestroy)(LU, B);
 
     import mir.ndslice.algorithm: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto B = [ 1,  1,  1,  1,  1,
+               1,  1,  1,  1,  1 ].sliced(5, 2).as!double.slice;
+
+    auto LU = A.luDecomp();
+    auto m = solve(LU, B);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B));
 }
 
 unittest
@@ -1306,15 +1327,17 @@ unittest
           1,  1,  1,  1,  1,
           1,  1,  1,  1,  1 ]
             .sliced(5, 5)
-            .as!double.slice
-            .canonical;
+            .as!double.slice;
+    auto B2 = B.slice;
     auto C = B.slice;
 
     auto LU = luDecomp(A.transposed);
-    auto m = solve!(Yes.allowDestroy)(LU, B, Transpose.Trans);
+    auto m = solve!(Yes.allowDestroy)(LU, B, 'T');
+    auto m2 = solve!(Yes.allowDestroy)(LU, B2);
 
     import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A.transposed, m2), C));
 }
 
 unittest
@@ -1338,8 +1361,8 @@ unittest
             .as!double.slice
             .canonical;
 
-    auto LU = luDecomp(A);
-    auto m = solve(LU, B, Transpose.NoTrans);
+    auto LU = A.luDecomp();
+    auto m = solve(LU, B);
 
     import mir.ndslice.algorithm: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B));
@@ -1356,7 +1379,7 @@ unittest
             .sliced(4, 3)
             .as!double.slice;
 
-    auto LU = B.luDecomp();
+    auto LU = B.luDecomp!(Yes.allowDestroy)();
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
@@ -1373,12 +1396,13 @@ unittest
             .sliced(4, 4)
             .as!double.slice
             .canonical;
+    auto C = B.transposed.slice;
 
-    auto LU = B.luDecomp!(Yes.allowDestroy)();
+    auto LU = B.transposed.luDecomp!(Yes.allowDestroy)();
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
-    assert(res == B);
+    assert(res == C);
 }
 
 ///
