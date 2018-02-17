@@ -1157,6 +1157,13 @@ struct LUResult(T)
                 u[i][j] = lut[j][i];
         return u;
     }
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, size_t[] n, Iterator)
+              (Slice!(kind, n, Iterator) b,
+               char trans = 'N')
+    {
+        return luSolve!(allowDestroy)(lut, ipiv, b, trans);
+    }
 }
 
 /++
@@ -1199,42 +1206,114 @@ Solves a system of linear equations
 with a general 'N x N' matrix 'A' using the LU factorization computed by luDecomp.
 Params:
     allowDestroy = flag to delete the source matrix.
-    lu = factorization of matrix 'A', A = P * L * U.
+    lut = factorization of matrix 'A', A = P * L * U.
+    ipiv = the pivot indices from luDecomp.
     b = the right hand side matrix B.
+    trans = specifies the form of the system of equations:
+          = 'N': A * X = B (No transpose)
+          = 'T': A**T * X = B (Transpose)
+          = 'C': A**T * X = B (Conjugate transpose = Transpose)
 Returns:
     Return solve of the system linear equations.
 +/
-auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
-           T, SliceKind kind, size_t[] n, Iterator)
-          (LUResult!(T) lu,
-           Slice!(kind, n, Iterator) b,
+auto luSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+           SliceKind kindB, size_t[] n, IteratorB, IteratorLU)
+          (Slice!(Canonical, [2], IteratorLU) lut,
+           Slice!(Contiguous, [1], lapackint*) ipiv,
+           Slice!(kindB, n, IteratorB) b,
            char trans = 'N'
-           )
+          )
 in
 {
-    assert(lu.lut.length!0 == lu.lut.length!1, "matrix must be squared");
-    assert(lu.ipiv.length == lu.lut.length, "size ipiv must be equally num rows a");
+    assert(lut.length!0 == lut.length!1, "matrix must be squared");
+    assert(ipiv.length == lut.length, "size ipiv must be equally num rows a");
+    assert(lut.length!1 == b.length!0, "size column of lu must be equally num rows b");
 }
 body
 {
+    alias LU = BlasType!IteratorLU;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(LU, B);
+    static if(is(T == IteratorLU))
+        alias lut_ = lut;
+    else
+        auto lut_ = lut.as!T.slice.canonical;
+    
     //convect vector to matrix.
     static if(n[0] == 1)
         auto k = b.sliced(1, b.length);
     else
         auto k = b.transposed;
 
-    if(allowDestroy && k._stride!1 == 1)
+    if(allowDestroy && k._stride!1 == 1 && is(IteratorB == T*))
     {
         auto m = k.assumeCanonical;
-        getrs!T(lu.lut, m, lu.ipiv, trans);
+        getrs!T(lut_, m, ipiv, trans);
         return m.transposed;
     }
     else
     {
         auto m = k.as!T.slice.canonical;
-        getrs!T(lu.lut, m, lu.ipiv, trans);
+        getrs!T(lut_, m, ipiv, trans);
         return m.transposed;
     }
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto B =
+        [ 1,  1,  1,  1,  0,  0,  0,
+          1,  1,  1,  1,  0,  0,  0,
+          1,  1,  1,  1,  0,  0,  0,
+          1,  1,  1,  1,  0,  0,  0,
+          1,  1,  1,  1,  0,  0,  0 ]
+            .sliced(5, 7)
+            .as!double.slice
+            .universal;
+
+    auto B_ = B[0..$, 0..4];
+    auto LU = A.luDecomp();
+    auto m = luSolve(LU.lut, LU.ipiv, B_);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B_));
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    
+    import std.random;
+    import std.datetime: Clock;
+    auto rnd = Random(Clock.currTime().second);
+    auto m = uniform(0, 100, rnd);
+    auto B = uninitSlice!double(A.length!1, m);
+    foreach(i;0..B.length!0)
+        foreach(j;0..B.length!1)
+            B[i][j] = uniform(0, 100, rnd);
+    
+    auto LU = A.luDecomp();
+    auto X = LU.solve(B);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
 }
 
 ///
@@ -1261,10 +1340,12 @@ unittest
     auto C = B.slice;
 
     auto LU = A.luDecomp();
-    auto m = solve!(Yes.allowDestroy)(LU, B.transposed);
+    auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B.transposed);
+    auto m2 = LU.solve(C);
 
     import mir.ndslice.algorithm: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m2), C));
 }
 
 unittest
