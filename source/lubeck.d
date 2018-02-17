@@ -1157,6 +1157,7 @@ struct LUResult(T)
                 u[i][j] = lut[j][i];
         return u;
     }
+    ///Return solves a system of linear equations A * X = B, using LU factorization.
     auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                SliceKind kind, size_t[] n, Iterator)
               (Slice!(kind, n, Iterator) b,
@@ -1234,7 +1235,7 @@ body
     alias LU = BlasType!IteratorLU;
     alias B = BlasType!IteratorB;
     alias T = CommonType!(LU, B);
-    static if(is(T == IteratorLU))
+    static if(is(T* == IteratorLU))
         alias lut_ = lut;
     else
         auto lut_ = lut.as!T.slice.canonical;
@@ -1800,6 +1801,26 @@ unittest
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
 }
 
+struct choleskyResult(T)
+{
+    ///If uplo = 'L': lower triangle of 'matrix' is stored.
+    ///If uplo = 'U': upper triangle of 'matrix' is stored.
+    char uplo;
+    ///if uplo = Lower, the leading 'N x N' lower triangular part of A
+    ///contains the lower triangular part of the matrix A, and the
+    ///strictly upper triangular part if A is not referenced.
+    ///if uplo = Upper, the leading 'N x N' upper triangular part of A
+    ///contains the upper triangular part of the matrix A, and the
+    ///strictly lower triangular part if A is not referenced.
+    Slice!(Canonical, [2], T*) matrix;
+    ///Return solves a system of linear equations A * X = B, using Cholesky factorization.
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, size_t[] n, Iterator)
+              (Slice!(kind, n, Iterator) b)
+    {
+        return choleskySolve!(allowDestroy)(matrix, b, uplo);
+    }
+}
 /++
 Computs Cholesky decomposition of symmetric positive definite matrix 'A'.
 The factorization has the form:
@@ -1808,30 +1829,164 @@ The factorization has the form:
 Where U is an upper triangular matrix and L is lower triangular.
 Params:
     a = symmetric 'N x N' matrix.
-    uplo = if uplo is Upper, then upper triangle of A is stored, else lower.
-Returns:
-    if uplo = Lower, the leading 'N x N' lower triangular part of A contains the lower triangular part of the matrix A, and the strictly upper triangular part if A is not referenced.
-    if uplo = Upper, the leading 'N x N' upper triangular part of A contains the upper triangular part of the matrix A, and the strictly lower triangular part if A is not referenced.
+    uplo = if uplo is Upper, then upper triangle of A is stored, else
+    lower.
+Returns: $(LREF choleskyResult)
 +/
-auto cholesky(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+auto choleskyDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
               SliceKind kind, Iterator)
              (Slice!(kind, [2], Iterator) a,
-              Uplo uplo)
+              char uplo)
 in
 {
     assert(a.length!0 == a.length!1, "matrix must be squared");
     assert(a == a.transposed, "matrix must be symmetric");
+    assert(a.length!1 == a.length!0, "num column a must be equally num rows b");
 }
 body
 {
+    import mir.ndslice.algorithm: eachUploPair;
     alias T = BlasType!Iterator;
-    static if(allowDestroy && kind != Universal && is(Iterator == T*))
-        alias m = a.canonical;
+    if(allowDestroy && a._stride!1)
+    {
+        auto m = a.assumeCanonical;
+        potrf!T(m, uplo);
+        if(uplo == 'L')
+            m.eachUploPair!"a = 0";
+        else
+            m.eachUploPair!"b = 0";
+        return choleskyResult!T(uplo, m);
+    }
     else
+    {
         auto m = a.as!T.slice.canonical;
+        potrf!T(m, uplo);
+        if(uplo == 'L')
+            m.eachUploPair!"a = 0";
+        else
+            m.eachUploPair!"b = 0";
+        return choleskyResult!T(uplo, m);
+    }
+}
 
-    potrf!T(m, uplo);
-    return m;
+/++
+    Solves a system of linear equations A * X = B with a symmetric matrix A using the
+    Cholesky factorization:
+    \A = U**T * U or
+    \A = L * L**T
+    computed by choleskyDecomp.
+Params:
+    c = the triangular factor 'U' or 'L' from the Cholesky factorization
+        \A = U**T * U or
+        \A = L * L**T,
+    as computed by choleskyDecomp.
+    b = the right hand side matrix.
+    uplo = 'U': Upper triangle of A is stored;
+         = 'L': Lower triangle of A is stored.
+Returns:
+    The solution matrix X.
++/
+auto choleskySolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+                   SliceKind kindB, size_t[] n, IteratorB, IteratorC)
+                  (Slice!(Canonical, [2], IteratorC) c,
+                   Slice!(kindB, n, IteratorB) b,
+                   char uplo)
+{
+    alias B = BlasType!IteratorB;
+    alias C = BlasType!IteratorC;
+    alias T = CommonType!(B, C);
+    static if(is(T* == IteratorC))
+        auto c_ = c;
+    else
+        auto c_ = c.as!T.slice.canonical;
+
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    if(allowDestroy && k._stride!1 == 1 && is(IteratorB == T*))
+    {
+        auto m = k.assumeCanonical;
+        potrs!T(c_, m, uplo);
+        return m.transposed;
+    }
+    else
+    {
+        auto m = k.as!T.slice.canonical;
+        potrs!T(c_, m, uplo);
+        return m.transposed;
+    }
+}
+
+///
+unittest
+{
+    auto A =
+           [ 25, 15, -5,
+             15, 18,  0,
+             -5,  0, 11 ]
+             .sliced(3, 3)
+             .as!double.slice;
+    
+    import std.random;
+    import std.datetime: Clock;
+    auto rnd = Random(Clock.currTime().second);
+    auto m = uniform(0, 100, rnd);
+    auto B = uninitSlice!double(A.length!1, m);
+    foreach(i;0..B.length!0)
+        foreach(j;0..B.length!1)
+            B[i][j] = uniform(0, 100, rnd);
+
+    auto C = A.choleskyDecomp('L');
+    auto X = C.solve(B);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  3,
+              1,  5,  5,
+              3,  5, 19 ]
+             .sliced(3, 3)
+             .as!double.slice
+             .universal;
+    auto B = [ 1,  1,  1 ].sliced(3).as!double.slice;
+    auto C_ = B.slice.sliced(3, 1);
+
+    auto C = A.choleskyDecomp('U');
+    auto X = choleskySolve!(Yes.allowDestroy)(C.matrix, B, C.uplo);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), C_));
+}
+
+unittest
+{
+    auto A =
+            [ 6,  15,  55,
+             15,  55, 225,
+             55, 225, 979 ]
+             .sliced(3, 3)
+             .as!double.slice
+             .canonical;
+    auto B =
+            [ 1,  1,
+              1,  1,
+              1,  1 ]
+              .sliced(3, 2)
+              .as!double.slice
+              .universal;
+
+    auto C = A.choleskyDecomp('L');
+    auto X = choleskySolve(C.matrix, B, C.uplo);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
 }
 
 ///
@@ -1844,15 +1999,13 @@ unittest
              .sliced(3, 3)
              .as!double.slice
              .universal;
+    auto A_ = A.slice;
 
-    import mir.ndslice.algorithm: each, eachUploPair;
-    auto C = A.cholesky(Uplo.Lower);
-    C.eachUploPair!"a = 0";
-    auto B = A.cholesky(Uplo.Upper);
-    B.eachUploPair!"b = 0";
+    auto C = A.choleskyDecomp('L');
+    auto B = A.choleskyDecomp!(Yes.allowDestroy)('U');
 
     import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C, B), A));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C.matrix, A), A_));
 }
 
 unittest
@@ -1865,14 +2018,11 @@ unittest
              .as!double.slice
              .universal;
 
-    import mir.ndslice.algorithm: each, eachUploPair;
-    auto C = A.cholesky(Uplo.Lower);
-    C.eachUploPair!"a = 0";
-    auto B = A.cholesky(Uplo.Upper);
-    B.eachUploPair!"b = 0";
+    auto C = A.choleskyDecomp('L');
+    auto B = A.choleskyDecomp('U');
     
     import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C, B), A));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C.matrix, B.matrix), A));
 }
 
 unittest
@@ -1884,12 +2034,9 @@ unittest
              .sliced(3, 3)
              .as!double.slice;
 
-    import mir.ndslice.algorithm: each, eachUploPair;
-    auto C = A.cholesky(Uplo.Lower);
-    C.eachUploPair!"a = 0";
-    auto B = A.cholesky(Uplo.Upper);
-    B.eachUploPair!"b = 0";
+    auto C = A.choleskyDecomp('L');
+    auto B = A.choleskyDecomp('U');
     
     import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C, B), A));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C.matrix, B.matrix), A));
 }
