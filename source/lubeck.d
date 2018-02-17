@@ -294,7 +294,32 @@ unittest
 ///
 struct SvdResult(T)
 {
-    ///
+///
+size_t potrf(T)(
+    Slice!(Canonical, [2], T*) a,
+    char uplo
+    )
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+    import mir.ndslice.dynamic: transposed;
+    assert(a == a.transposed, "matrix must be symmetric");
+
+    lapackint n = cast(lapackint) a.length;
+    lapackint lda = cast(lapackint) a.length;
+    lapackint info = void;
+    char c_uplo = 'U';
+    if(uplo == 'U')
+        c_uplo = 'L';
+
+    lapack.potrf_(c_uplo, n, a.iterator, lda, info);
+
+    ///if info == 0: successful exit.
+    ///if info > 0: the leading minor of order i is not positive definite, and the
+    ///factorization could not be completed.
+    ///if info < 0: if info == -i, the i-th argument had an illegal value.
+    assert(info == 0);
+    return info;
+}    ///
     Slice!(Contiguous, [2], T*) u;
     ///
     Slice!(Contiguous, [1], T*) sigma;
@@ -1840,8 +1865,6 @@ auto choleskyDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
 in
 {
     assert(a.length!0 == a.length!1, "matrix must be squared");
-    assert(a == a.transposed, "matrix must be symmetric");
-    assert(a.length!1 == a.length!0, "num column a must be equally num rows b");
 }
 body
 {
@@ -1891,6 +1914,12 @@ auto choleskySolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                   (Slice!(Canonical, [2], IteratorC) c,
                    Slice!(kindB, n, IteratorB) b,
                    char uplo)
+in
+{
+    assert(c.length!0 == c.length!1, "matrix must be squared");
+    assert(c.length!1 == b.length!0, "num column a must be equally num rows b");
+}
+body
 {
     alias B = BlasType!IteratorB;
     alias C = BlasType!IteratorC;
