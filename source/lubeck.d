@@ -1512,68 +1512,179 @@ unittest
     assert(res == C);
 }
 
-///
+///Consist LDL factorization;
 struct LDLResult(T)
 {
-    ///Matrix in witch lower triangular matrix is 'L' part of decomposition, diagonal is 'D' part.
-    Slice!(Canonical, [2], T*) ld;
+    ///Matrix in witch lower triangular matrix is 'L' part of
+    ///factorization, diagonal is 'D' part.
+    Slice!(Canonical, [2], T*) matrix;
     ///The pivot indices.
-    ///If ipiv(k) > 0, then rows and columns k and ipiv(k) were interchanged and D(k, k) is a '1 x 1' diagonal block.
-    ///If ipiv(k) = ipiv(k + 1) < 0, then rows and columns k+1 and -ipiv(k) were interchanged and D(k:k+1, k:k+1) is a '2 x 2' diagonal block.
+    ///If ipiv(k) > 0, then rows and columns k and ipiv(k) were
+    ///interchanged and D(k, k) is a '1 x 1' diagonal block.
+    ///If ipiv(k) = ipiv(k + 1) < 0, then rows and columns k+1 and
+    ///-ipiv(k) were interchanged and D(k:k+1, k:k+1) is a '2 x 2'
+    ///diagonal block.
     Slice!(Contiguous, [1], lapackint*) ipiv;
-    ///L part of the decomposition.
-    auto l()
+    ///uplo = 'U': Upper triangle is stored;
+    ///     = 'L': lower triangle is stored.
+    char uplo;
+    ///Return solves a system of linear equations A * X = B, using LDL factorization.
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kindB, size_t[] n, IteratorB)
+              (Slice!(kindB, n, IteratorB) b)
     {
-        import mir.ndslice.algorithm: eachUploPair;
-        auto l = ld.as!T.slice.canonical;
-        l.eachUploPair!"a = 0";
-        l.diagonal[] = 1;
-        return l;
-    }
-    ///D part of the decomposition.
-    auto d()
-    {
-        import mir.ndslice.algorithm: eachUploPair;
-        auto d = ld.as!T.slice.canonical;
-        d.eachUploPair!"a = 0";
-        d.eachUploPair!"b = 0";
-        return d;
+        return ldlSolve!(allowDestroy)(matrix, ipiv, b, uplo);
     }
 }
 
 /++
-Computes the factorization of a real symmetric matrix A using the Bunch-Kaufman diagonal pivoting method.
+Computes the factorization of a real symmetric matrix A using the
+Bunch-Kaufman diagonal pivoting method.
 The for of the factorization is:
-    A = L*D*L**T
-Where L is product if permutation and unit lower triangular matrices, and D is symmetric and block diagonal with '1 x 1' and '2 x 2' diagonal blocks.
+    \A = L*D*L**T
+Where L is product if permutation and unit lower triangular matrices,
+and D is symmetric and block diagonal with '1 x 1' and '2 x 2'
+diagonal blocks.
 Params:
     a = input symmetric 'n x n' matrix for factorization.
+    uplo = 'U': Upper triangle is stored;
+         = 'L': lower triangle is stored.
 Returns:$(LREF LDLResult)
 +/
-auto LDL_decomposition(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
-                       SliceKind kind, Iterator)
-                      (Slice!(kind, [2], Iterator) a)
+auto ldlDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, Iterator)
+              (Slice!(kind, [2], Iterator) a,
+               char uplo = 'L')
 in
 {
     assert(a.length!0 == a.length!1, "matrix must be squared");
-    assert(a == a.transposed, "matrix must be symmetric");
 }
 body
 {
     alias T = BlasType!Iterator;
-    static if(allowDestroy && kind != Universal && is(Iterator == T*))
-        alias m = a.canonical;
-    else
-        auto m = a.as!T.slice.canonical;
-    import mir.ndslice.algorithm: eachUploPair;
-    auto ipiv = m.length.uninitSlice!lapackint;
-    auto work = [m.length * 3].uninitSlice!T;
-    sytrf!T(m, ipiv, work, Uplo.Lower);
+    setBuffer!T(a.length);
+    auto ipiv = a.length.uninitSlice!lapackint;
 
-    return LDLResult!T(m.transposed.as!T.slice.canonical, ipiv);
+    if(allowDestroy && a._stride!1 == 1)
+    {
+        import mir.ndslice.algorithm: eachUploPair;
+        auto m = a.assumeCanonical;
+        sytrf!T(m, ipiv, cast(T*) _buffer, cast(lapackint) _buffer.length, uplo);
+        if(uplo == 'L')
+            m.eachUploPair!"b = 0";
+        else
+            m.eachUploPair!"a = 0";
+        return LDLResult!T(m, ipiv, uplo);
+    }
+    else
+    {
+        import mir.ndslice.algorithm: eachUploPair;
+        auto m = a.transposed.as!T.slice.canonical;
+        sytrf!T(m, ipiv, cast(T*) _buffer, cast(lapackint) _buffer.length, uplo);
+        if(uplo == 'L')
+            m.eachUploPair!"b = 0";
+        else
+            m.eachUploPair!"a = 0";
+        return LDLResult!T(m, ipiv, uplo);
+    }
+}
+
+void setBuffer(T)(ulong length)
+{
+    int n = 1;
+    while(n < length)
+    {
+        n = n << 1;
+    }
+    _buffer = new Unqual!T[n];
+}
+
+/++
+Solves a system of linear equations A * X = B with symmetric matrix A using the
+factorization A = U * D * U**T or A = L * D * L**T computed by ldlDecomp.
+Params:
+    a = 'LD' or 'UD' matrix computed by ldlDecomp.
+    ipiv = details of the interchanges and the block structure of D as determined by ldlDecomp.
+    b = the right hand side matrix.
+    uplo = specifies whether the details of the factorization are stored as an upper or
+           lower triangular matrix:
+         = 'U': Upper triangular, form is A = U * D * U**T;
+         = 'L': Lower triangular, form is A = L * D * L**T.
+Returns:
+    The solution matrix.
++/
+auto ldlSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+              SliceKind kindB, size_t[] n, IteratorB, IteratorA)
+             (Slice!(Canonical, [2], IteratorA) a,
+              Slice!(Contiguous, [1], lapackint*) ipiv,
+              Slice!(kindB, n, IteratorB) b,
+              char uplo = 'L'
+             )
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+    assert(ipiv.length == a.length, "size ipiv must be equally num rows a");
+    assert(a.length!1 == b.length!0, "size column of lu must be equally num rows b");
+}
+body
+{
+    alias A = BlasType!IteratorA;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(A, B);
+    static if(is(T* == IteratorA))
+        alias a_ = a;
+    else
+        auto a_ = a.as!T.slice.canonical;
+    
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    setBuffer!T(a.length);
+    if(allowDestroy && k._stride!1 == 1 && is(IteratorB == T*))
+    {
+        auto m = k.assumeCanonical;
+        sytrs2!T(a_, m, ipiv, uplo, cast(T*) _buffer);
+        return m.transposed;
+    }
+    else
+    {
+        auto m = k.as!T.slice.canonical;
+        sytrs2!T(a_, m, ipiv, uplo, cast(T*) _buffer);
+        return m.transposed;
+    }
 }
 
 ///
+unittest
+{
+    auto A =
+        [ 2.07,  3.87,  4.20, -1.15,
+          3.87, -0.21,  1.87,  0.63,
+          4.20,  1.87,  1.15,  2.06,
+         -1.15,  0.63,  2.06, -1.81 ]
+            .sliced(4, 4)
+            .as!double.slice
+            .canonical;
+
+    import std.random;
+    import std.datetime: Clock;
+    auto rnd = Random(Clock.currTime().second);
+    auto m = uniform(0, 100, rnd);
+    auto B = uninitSlice!double(A.length!1, m);
+    foreach(i;0..B.length!0)
+        foreach(j;0..B.length!1)
+            B[i][j] = uniform(0, 100, rnd);
+
+    auto LDL = A.ldlDecomp('L');
+    auto X = LDL.solve(B);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
+}
+
 unittest
 {
     auto A =
@@ -1583,9 +1694,22 @@ unittest
             .sliced(3, 3)
             .as!double.slice
             .canonical;
+    auto A_ = A.slice;
 
-    auto LDL = A.LDL_decomposition;
-    assert(mtimes(mtimes(LDL.l, LDL.d), LDL.l.transposed) == A);
+    auto B =
+        [ 1,  1,  1,
+          1,  1,  1,
+          1,  1,  1 ]
+          .sliced(3, 3)
+          .as!double.slice
+          .canonical;
+    auto B_ = B.slice;
+
+    auto LDL = A.ldlDecomp!(Yes.allowDestroy)('L');
+    auto X = ldlSolve!(Yes.allowDestroy)(A, LDL.ipiv, B.transposed, LDL.uplo);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A_, X), B_));
 }
 
 unittest
@@ -1596,142 +1720,15 @@ unittest
          30, 80, 171 ]
             .sliced(3, 3)
             .as!double.slice
-            .universal;
-
-    auto LDL = A.LDL_decomposition;
-    auto detA = cast(double) det(A);
-    auto detD = cast(double) det(LDL.d);
-
-    assert(detA == detA);
-}
-
-
-unittest
-{
-    auto A =
-        [9,  5, -2,
-         5,  8,  2,
-        -2,  2,  6 ]
-            .sliced(3, 3)
-            .as!double.slice
-            .universal;
-
-    auto LDL = A.LDL_decomposition;
-    auto detA = cast(double) det(A);
-    auto detD = cast(double) det(LDL.d);
-
-    assert(detA == detD);
-}
-
-///
-struct UDUResult(T)
-{
-    ///Matrix in witch upper triangular matrix is 'L' part of decomposition, diagonal is 'D' part.
-    Slice!(Canonical, [2], T*) ud;
-    ///The pivot indices.
-    ///If ipiv(k) > 0, then rows and columns k and ipiv(k) were interchanged and D(k, k) is a '1 x 1' diagonal block.
-    ///If ipiv(k) = ipiv(k - 1) < 0, then rows and columns k-1 and -ipiv(k) were interchanged and D(k:k+1, k:k+1) is a '2 x 2' diagonal block.
-    Slice!(Contiguous, [1], lapackint*) ipiv;
-    ///U part of the decomposition.
-    auto u()
-    {
-        import mir.ndslice.algorithm: eachUploPair;
-        auto u = ud.as!T.slice.canonical;
-        u.eachUploPair!"b = 0";
-        u.diagonal[] = 1;
-        return u;
-    }
-    ///D part of the decomposition.
-    auto d()
-    {
-        import mir.ndslice.algorithm: eachUploPair;
-        auto d = ud.as!T.slice.canonical;
-        d.eachUploPair!"a = 0";
-        d.eachUploPair!"b = 0";
-        return d;
-    }
-}
-
-/++
-Computes the factorization of a real symmetric matrix A using the Bunch-Kaufman diagonal pivoting method.
-The for of the factorization is:
-    A = U*D*U**T
-Where U is product if permutation and unit upper triangular matrices, and D is symmetric and block diagonal with '1 x 1' and '2 x 2' diagonal blocks.
-Params:
-    a = input symmetric 'n x n' matrix for factorization.
-Returns:$(LREF LDLResult)
-+/
-auto UDU_decomposition(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
-                       SliceKind kind, Iterator)
-                      (Slice!(kind, [2], Iterator) a)
-in
-{
-    assert(a.length!0 == a.length!1, "matrix must be squared");
-    assert(a == a.transposed, "matrix must be symmetric");
-}
-body
-{
-    alias T = BlasType!Iterator;
-    static if(allowDestroy && kind != Universal && is(Iterator == T*))
-        alias m = a.canonical;
-    else
-        auto m = a.as!T.slice.canonical;
-    import mir.ndslice.algorithm: eachUploPair;
-    auto ipiv = m.length.uninitSlice!lapackint;
-    auto work = [m.length * 3].uninitSlice!T;
-    sytrf!T(m, ipiv, work, Uplo.Upper);
-
-    return UDUResult!T(m.transposed.as!T.slice.canonical, ipiv);
-}
-
-///
-unittest
-{
-    auto A =
-        [ 9, -1,  2,
-         -1,  8, -5,
-          2, -5,  7 ]
-            .sliced(3, 3)
-            .as!double.slice
             .canonical;
+    auto B = [ 1, 1, 1 ].sliced(3).as!double.slice.canonical;
+    auto B_ = B.sliced(3, 1);
 
-    auto UDU = A.UDU_decomposition;
-    auto res = mtimes(mtimes(UDU.u, UDU.d), UDU.u.transposed);
+    auto LDL = A.ldlDecomp('L');
+    auto X = LDL.solve(B);
+    
     import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
-}
-
-unittest
-{
-    auto A =
-        [10, 20, 30,
-         20, 45, 80,
-         30, 80, 171 ]
-            .sliced(3, 3)
-            .as!double.slice
-            .universal;
-
-    auto UDU = A.UDU_decomposition;
-    auto res = mtimes(mtimes(UDU.u, UDU.d), UDU.u.transposed);
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
-}
-
-
-unittest
-{
-    auto A =
-        [9,  5, -2,
-         5,  8,  2,
-        -2,  2,  6 ]
-            .sliced(3, 3)
-            .as!double.slice
-            .universal;
-
-    auto UDU = A.UDU_decomposition;
-    auto res = mtimes(mtimes(UDU.u, UDU.d), UDU.u.transposed);
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B_));
 }
 
 ///
