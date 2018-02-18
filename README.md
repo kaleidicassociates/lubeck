@@ -24,11 +24,10 @@ if A is not a square matrix.
 
 ```d
 /+dub.sdl:
-dependency "lubeck" version="~>0.0"
-dependency "mir-algorithm" version="~>0.7"
+dependency "lubeck" version="~>0.0.4"
 libs "lapack" "blas"
-
 +/
+// or libs "openblas"
 import std.stdio;
 import mir.ndslice: magic, repeat, as, slice;
 import lubeck: mtimes;
