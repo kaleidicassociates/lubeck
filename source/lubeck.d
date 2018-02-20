@@ -1065,7 +1065,7 @@ Returns:
                         Slice!(Contiguous, [1], lapackint*) ipiv)
     {
         import mir.ndslice.algorithm: each;
-        for(int i = cast(int) ipiv.length - 1; i >= 0; --i)
+        foreach_reverse(i;0..ipiv.length)
         {
             if(ipiv[i] == i + 1)
                 continue;
@@ -1158,31 +1158,22 @@ struct LUResult(T)
     ///was interchanged with row ipiv(i).
     Slice!(Contiguous, [1], lapackint*) ipiv;
     ///L part of the factorization.
-    auto l()
+    auto l() @property
     {
-        auto l = uninitSlice!T(lut.length!1, min(lut.length!0, lut.length!1));
-        foreach(i;0..l.length!0)
-        {
-            foreach(j;0..min(i + 1, l.length!1))
-            {
-                if(i == j)
-                    l[i][j] = 1;
-                else
-                    l[i][j] = lut[j][i];
-            }
-        }
+        import mir.ndslice.algorithm: eachUpper;
+        auto l = lut.transposed[0..lut.length!1, 0..min(lut.length!0, lut.length!1)].slice.canonical;
+        l.eachUpper!"a = 0";
+        l.diagonal[] = 1;
         return l;
     }
     ///U part of the factorization.
-    auto u()
+    auto u() @property
     {
-        auto u = uninitSlice!T(min(lut.length!0, lut.length!1), lut.length!0);
-        foreach(i;0..u.length!0)
-            foreach(j;i..u.length!1)
-                u[i][j] = lut[j][i];
+        import mir.ndslice.algorithm: eachLower;
+        auto u = lut.transposed[0..min(lut.length!0, lut.length!1), 0..lut.length!0].slice.canonical;
+        u.eachLower!"a = 0";
         return u;
     }
-    ///Return solves a system of linear equations A * X = B, using LU factorization.
     auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                SliceKind kind, size_t[] n, Iterator)
               (Slice!(kind, n, Iterator) b,
@@ -1196,11 +1187,12 @@ struct LUResult(T)
 Computes LU factorization of a general 'M x N' matrix 'A' using partial
 pivoting with row interchanges.
 The factorization has the form:
-    A = P * L * U
+    \A = P * L * U
 Where P is a permutation matrix, L is lower triangular with unit
 diagonal elements (lower trapezoidal if m > n), and U is upper
 triangular (upper trapezoidal if m < n).
 Params:
+    allowDestroy = flag to delete the source matrix.
     a = input 'M x N' matrix for factorization.
 Returns: $(LREF LUResalt)
 +/
@@ -1228,7 +1220,8 @@ auto luDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
 
 /++
 Solves a system of linear equations
-    \A * X = B or A**T * X = B
+    \A * X = B, or
+    \A**T * X = B
 with a general 'N x N' matrix 'A' using the LU factorization computed by luDecomp.
 Params:
     allowDestroy = flag to delete the source matrix.
@@ -1252,8 +1245,8 @@ auto luSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
 in
 {
     assert(lut.length!0 == lut.length!1, "matrix must be squared");
-    assert(ipiv.length == lut.length, "size ipiv must be equally num rows a");
-    assert(lut.length!1 == b.length!0, "size column of lu must be equally num rows b");
+    assert(ipiv.length == lut.length, "size of ipiv must be equal to the number of rows a");
+    assert(lut.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
 body
 {
@@ -1310,8 +1303,9 @@ unittest
     auto LU = A.luDecomp();
     auto m = luSolve(LU.lut, LU.ipiv, B_);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B_));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), B_));
 }
 
 unittest
@@ -1369,9 +1363,11 @@ unittest
     auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B.transposed);
     auto m2 = LU.solve(C);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m2), C));
+    
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), C));
+    assert(all!approxEqual(mtimes(A, m2), C));
 }
 
 unittest
@@ -1389,10 +1385,11 @@ unittest
     auto C = B.slice.sliced(5, 1);
 
     auto LU = A.luDecomp();
-    auto m = solve!(Yes.allowDestroy)(LU, B);
+    auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), C));
 }
 
 unittest
@@ -1410,10 +1407,11 @@ unittest
                1,  1,  1,  1,  1 ].sliced(5, 2).as!double.slice;
 
     auto LU = A.luDecomp();
-    auto m = solve(LU, B);
+    auto m = luSolve(LU.lut, LU.ipiv, B);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), B));
 }
 
 unittest
@@ -1439,12 +1437,13 @@ unittest
     auto C = B.slice;
 
     auto LU = luDecomp(A.transposed);
-    auto m = solve!(Yes.allowDestroy)(LU, B, 'T');
-    auto m2 = solve!(Yes.allowDestroy)(LU, B2);
+    auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B, 'T');
+    auto m2 = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B2);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), C));
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A.transposed, m2), C));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), C));
+    assert(all!approxEqual(mtimes(A.transposed, m2), C));
 }
 
 unittest
@@ -1469,10 +1468,11 @@ unittest
             .canonical;
 
     auto LU = A.luDecomp();
-    auto m = solve(LU, B);
+    auto m = luSolve(LU.lut, LU.ipiv, B);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, m), B));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), B));
 }
 
 unittest
@@ -1487,6 +1487,7 @@ unittest
             .as!double.slice;
 
     auto LU = B.luDecomp!(Yes.allowDestroy)();
+    LU.l; LU.u;
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
@@ -1546,6 +1547,7 @@ Where L is product if permutation and unit lower triangular matrices,
 and D is symmetric and block diagonal with '1 x 1' and '2 x 2'
 diagonal blocks.
 Params:
+    allowDestroy = flag to delete the source matrix.
     a = input symmetric 'n x n' matrix for factorization.
     uplo = 'U': Upper triangle is stored;
          = 'L': lower triangle is stored.
@@ -1562,54 +1564,42 @@ in
 body
 {
     alias T = BlasType!Iterator;
-    setBuffer!T(a.length);
+    auto work = [T.sizeof * a.length].uninitSlice!T;
     auto ipiv = a.length.uninitSlice!lapackint;
 
     if(allowDestroy && a._stride!1 == 1)
     {
         import mir.ndslice.algorithm: eachUploPair;
         auto m = a.assumeCanonical;
-        sytrf!T(m, ipiv, cast(T*) _buffer, cast(lapackint) _buffer.length, uplo);
-        if(uplo == 'L')
-            m.eachUploPair!"b = 0";
-        else
-            m.eachUploPair!"a = 0";
+        sytrf!T(m, ipiv, work, uplo);
+        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
         return LDLResult!T(m, ipiv, uplo);
     }
     else
     {
         import mir.ndslice.algorithm: eachUploPair;
         auto m = a.transposed.as!T.slice.canonical;
-        sytrf!T(m, ipiv, cast(T*) _buffer, cast(lapackint) _buffer.length, uplo);
-        if(uplo == 'L')
-            m.eachUploPair!"b = 0";
-        else
-            m.eachUploPair!"a = 0";
+        sytrf!T(m, ipiv, work, uplo);
+        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
         return LDLResult!T(m, ipiv, uplo);
     }
 }
 
-void setBuffer(T)(ulong length)
-{
-    int n = 1;
-    while(n < length)
-    {
-        n = n << 1;
-    }
-    _buffer = new Unqual!T[n];
-}
-
 /++
-Solves a system of linear equations A * X = B with symmetric matrix A using the
-factorization A = U * D * U**T or A = L * D * L**T computed by ldlDecomp.
+Solves a system of linear equations \A * X = B with symmetric matrix 'A' using the
+factorization
+\A = U * D * U**T, or
+\A = L * D * L**T
+computed by ldlDecomp.
 Params:
+    allowDestroy = flag to delete the source matrix.
     a = 'LD' or 'UD' matrix computed by ldlDecomp.
     ipiv = details of the interchanges and the block structure of D as determined by ldlDecomp.
     b = the right hand side matrix.
     uplo = specifies whether the details of the factorization are stored as an upper or
            lower triangular matrix:
-         = 'U': Upper triangular, form is A = U * D * U**T;
-         = 'L': Lower triangular, form is A = L * D * L**T.
+         = 'U': Upper triangular, form is \A = U * D * U**T;
+         = 'L': Lower triangular, form is \A = L * D * L**T.
 Returns:
     The solution matrix.
 +/
@@ -1623,8 +1613,8 @@ auto ldlSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
 in
 {
     assert(a.length!0 == a.length!1, "matrix must be squared");
-    assert(ipiv.length == a.length, "size ipiv must be equally num rows a");
-    assert(a.length!1 == b.length!0, "size column of lu must be equally num rows b");
+    assert(ipiv.length == a.length, "size of ipiv must be equal to the number of rows a");
+    assert(a.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
 body
 {
@@ -1642,17 +1632,17 @@ body
     else
         auto k = b.transposed;
 
-    setBuffer!T(a.length);
+    auto work = [T.sizeof * a.length].uninitSlice!T;
     if(allowDestroy && k._stride!1 == 1 && is(IteratorB == T*))
     {
         auto m = k.assumeCanonical;
-        sytrs2!T(a_, m, ipiv, uplo, cast(T*) _buffer);
+        sytrs2!T(a_, m, ipiv, work, uplo);
         return m.transposed;
     }
     else
     {
         auto m = k.as!T.slice.canonical;
-        sytrs2!T(a_, m, ipiv, uplo, cast(T*) _buffer);
+        sytrs2!T(a_, m, ipiv, work, uplo);
         return m.transposed;
     }
 }
@@ -1681,8 +1671,9 @@ unittest
     auto LDL = A.ldlDecomp('L');
     auto X = LDL.solve(B);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
 }
 
 unittest
@@ -1708,8 +1699,9 @@ unittest
     auto LDL = A.ldlDecomp!(Yes.allowDestroy)('L');
     auto X = ldlSolve!(Yes.allowDestroy)(A, LDL.ipiv, B.transposed, LDL.uplo);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A_, X), B_));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A_, X), B_));
 }
 
 unittest
@@ -1727,100 +1719,9 @@ unittest
     auto LDL = A.ldlDecomp('L');
     auto X = LDL.solve(B);
     
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B_));
-}
-
-///
-struct QRResult(T)
-{
-    ///Q part transposed
-    Slice!(Canonical, [2], T*) qt;
-    ///R part transposed
-    Slice!(Canonical, [2], T*) rt;
-    ///Matrix returned from lapack, when matrix used from computes Q part, and upper triangle is R part
-    Slice!(Canonical, [2], T*) qrt;
-    ///The scalar factors of the elementary reflectors
-    Slice!(Contiguous, [1], T*) tau;
-}
-
-/++
-Computes QR decomposition
-Params:
-    a = initial matrix
-Returns: $(LREF QRResult)
-+/
-auto qr(SliceKind kind, Iterator)
-       (Slice!(kind, [2], Iterator) a)
-in
-{
-    assert(a.length!0 == a.length!1, "matrix must be squared");
-}
-body
-{
-    alias T = BlasType!Iterator;
-    auto m = a.as!T.slice.canonical;
-    int min_size = cast(int) min(a.length!0, a.length!1);
-    auto tau = min_size.uninitSlice!T;
-    auto work = [m.length!1 * 64].uninitSlice!T;
-
-    geqrf!T(m, tau, work);
-    auto R = m.slice.canonical;
-    auto Q = m.slice.canonical;
-
-    import mir.ndslice.algorithm: each, eachUploPair;
-    R.eachUploPair!"a = 0";
-    orgqr(Q, tau, work);
-    return QRResult!T(Q, R, m, tau);
-}
-
-///
-unittest
-{
-    auto A =
-            [ 1,  1,  0,
-              1,  0,  1,
-              0,  1,  1 ]
-              .sliced(3, 3)
-              .as!double.slice;
-    auto QR = A.qr;
-    auto res = mtimes(QR.qt.transposed, QR.rt.transposed).universal;
-    res = res.transposed;
-
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
-}
-
-unittest
-{
-    auto A =
-            [ 1,  1,  0,  5,
-              1,  0,  1,  4,
-              0,  1,  1,  2,
-              2,  3,  5,  1 ]
-              .sliced(4, 4)
-              .as!double.slice;
-    auto QR = A.qr;
-    auto res = mtimes(QR.qt.transposed, QR.rt.transposed).universal;
-    res = res.transposed;
-
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
-}
-
-unittest
-{
-    auto A =
-            [ 1,  1,
-              1,  0 ]
-              .sliced(2, 2)
-              .as!double.slice;
-    auto QR = A.qr;
-    auto res = mtimes(QR.qt.transposed, QR.rt.transposed).universal;
-    res = res.transposed;
-
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, A));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B_));
 }
 
 struct choleskyResult(T)
@@ -1846,10 +1747,11 @@ struct choleskyResult(T)
 /++
 Computs Cholesky decomposition of symmetric positive definite matrix 'A'.
 The factorization has the form:
-    A = U**T * U, if UPLO = Upper, or
-    A = L * L**T, if UPLO = Lower
+    \A = U**T * U, if UPLO = Upper, or
+    \A = L * L**T, if UPLO = Lower
 Where U is an upper triangular matrix and L is lower triangular.
 Params:
+    allowDestroy = flag to delete the source matrix.
     a = symmetric 'N x N' matrix.
     uplo = if uplo is Upper, then upper triangle of A is stored, else
     lower.
@@ -1871,20 +1773,14 @@ body
     {
         auto m = a.assumeCanonical;
         potrf!T(m, uplo);
-        if(uplo == 'L')
-            m.eachUploPair!"a = 0";
-        else
-            m.eachUploPair!"b = 0";
+        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
         return choleskyResult!T(uplo, m);
     }
     else
     {
         auto m = a.as!T.slice.canonical;
         potrf!T(m, uplo);
-        if(uplo == 'L')
-            m.eachUploPair!"a = 0";
-        else
-            m.eachUploPair!"b = 0";
+        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
         return choleskyResult!T(uplo, m);
     }
 }
@@ -1896,6 +1792,7 @@ body
     \A = L * L**T
     computed by choleskyDecomp.
 Params:
+    allowDestroy = flag to delete the source matrix.
     c = the triangular factor 'U' or 'L' from the Cholesky factorization
         \A = U**T * U or
         \A = L * L**T,
@@ -1914,7 +1811,7 @@ auto choleskySolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
 in
 {
     assert(c.length!0 == c.length!1, "matrix must be squared");
-    assert(c.length!1 == b.length!0, "num column a must be equally num rows b");
+    assert(c.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
 body
 {
@@ -1968,8 +1865,9 @@ unittest
     auto C = A.choleskyDecomp('L');
     auto X = C.solve(B);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
 }
 
 unittest
@@ -1987,8 +1885,9 @@ unittest
     auto C = A.choleskyDecomp('U');
     auto X = choleskySolve!(Yes.allowDestroy)(C.matrix, B, C.uplo);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), C_));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), C_));
 }
 
 unittest
@@ -2011,58 +1910,7 @@ unittest
     auto C = A.choleskyDecomp('L');
     auto X = choleskySolve(C.matrix, B, C.uplo);
 
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
-}
-
-///
-unittest
-{
-    auto A =
-            [ 6,  15,  55,
-             15,  55, 225,
-             55, 225, 979 ]
-             .sliced(3, 3)
-             .as!double.slice
-             .universal;
-    auto A_ = A.slice;
-
-    auto C = A.choleskyDecomp('L');
-    auto B = A.choleskyDecomp!(Yes.allowDestroy)('U');
-
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C.matrix, A), A_));
-}
-
-unittest
-{
-    auto A =
-            [ 1,  1,  3,
-              1,  5,  5,
-              3,  5, 19 ]
-             .sliced(3, 3)
-             .as!double.slice
-             .universal;
-
-    auto C = A.choleskyDecomp('L');
-    auto B = A.choleskyDecomp('U');
-    
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C.matrix, B.matrix), A));
-}
-
-unittest
-{
-    auto A =
-           [ 25, 15, -5,
-             15, 18,  0,
-             -5,  0, 11 ]
-             .sliced(3, 3)
-             .as!double.slice;
-
-    auto C = A.choleskyDecomp('L');
-    auto B = A.choleskyDecomp('U');
-    
-    import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(C.matrix, B.matrix), A));
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
 }
