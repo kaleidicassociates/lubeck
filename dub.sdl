@@ -4,7 +4,7 @@ authors "Ilya Yaroshenko" "Lars Tandle Kyllingstad (SciD author)"
 copyright "Copyright © 2017, Symmetry Investments & Kaleidic Associates; Copyright (c) 2009, Lars T. Kyllingstad (SciD)"
 license "BSL-1.0"
 dependency "mir-lapack" version="~>0.0.3"
-dependency "mir-blas" version="~>0.0.2"
+dependency "mir-blas" version="~>0.1.0"
 
 buildType "unittest" {
 	buildOptions "unittests" "debugMode" "debugInfo"

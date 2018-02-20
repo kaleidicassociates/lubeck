@@ -85,8 +85,15 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
 
         auto c = uninitSlice!C(a.length!0, b.length!1);
 
-        gemm(cast(C)1, a, b, cast(C)0, c);
-
+        if (a.length!1 == 1 && b.length!0 == 1)
+        {
+            c[] = 0;
+            ger(cast(C)1, a[0..$,0], b[0,0..$], c);
+        }
+        else
+        {
+            gemm(cast(C)1, a, b, cast(C)0, c);
+        }
         return c;
     }
 }
@@ -112,6 +119,21 @@ unittest
          [-69, -21, -42, 21],
          [ 23,  69,   3, 29]]
         );
+}
+
+/// ger specialized case in mtimes
+unittest
+{
+    {
+        auto a = [1.0f, 2.0f].sliced(2, 1);
+        auto b = [1.0f, 2.0f].sliced(2, 1);
+        assert(mtimes(a, b.transposed) == [[1, 2], [2, 4]]);
+    }
+    {
+        auto a = [1.0, 2.0].sliced(1, 2);
+        auto b = [1.0, 2.0].sliced(1, 2);
+        assert(mtimes(a.transposed, b) == [[1, 2], [2, 4]]);
+    }
 }
 
 /++
