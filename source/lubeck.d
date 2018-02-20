@@ -85,8 +85,15 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
 
         auto c = uninitSlice!C(a.length!0, b.length!1);
 
-        gemm(cast(C)1, a, b, cast(C)0, c);
-
+        if (a.length!1 == 1 && b.length!0 == 1)
+        {
+            c[] = 0;
+            ger(cast(C)1, a.front!1, b.front, c);
+        }
+        else
+        {
+            gemm(cast(C)1, a, b, cast(C)0, c);
+        }
         return c;
     }
 }
@@ -112,6 +119,39 @@ unittest
          [-69, -21, -42, 21],
          [ 23,  69,   3, 29]]
         );
+}
+
+/// ger specialized case in mtimes
+unittest
+{
+    // from https://github.com/kaleidicassociates/lubeck/issues/8
+    {
+        auto a = [1.0f, 2.0f].sliced(2, 1);
+        auto b = [1.0f, 2.0f].sliced(2, 1);
+        assert(mtimes(a, b.transposed) == [[1, 2], [2, 4]]);
+    }
+    {
+        auto a = [1.0, 2.0].sliced(1, 2);
+        auto b = [1.0, 2.0].sliced(1, 2);
+        assert(mtimes(a.transposed, b) == [[1, 2], [2, 4]]);
+    }
+}
+
+///
+unittest
+{
+    // from https://github.com/kaleidicassociates/lubeck/issues/3
+    Slice!(cast(SliceKind)2, [2LU], float*) a = slice!float(1, 1);
+    Slice!(cast(SliceKind)0, [2LU], float*) b1 = slice!float(16, 1).transposed;
+    Slice!(cast(SliceKind)2, [2LU], float*) b2 = slice!float(1, 16);
+
+    a[] = 3;
+    b1[] = 4;
+    b2[] = 4;
+
+    // Confirm that this message does not appear
+    // Outputs: ** On entry to SGEMM  parameter number  8 had an illegal value
+    assert(a.mtimes(b1) == a.mtimes(b2));
 }
 
 /++
