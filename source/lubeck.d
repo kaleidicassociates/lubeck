@@ -85,12 +85,12 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
 
         auto c = uninitSlice!C(a.length!0, b.length!1);
 
-        if (a.length!1 == 1 && b.length!0 == 1)
-        {
-            c[] = 0;
-            ger(cast(C)1, a[0..$,0], b[0,0..$], c);
-        }
-        else
+        //if (a.length!1 == 1 && b.length!0 == 1)
+        //{
+        //    c[] = 0;
+        //    ger(cast(C)1, a.front!1, b.front, c);
+        //}
+        //else
         {
             gemm(cast(C)1, a, b, cast(C)0, c);
         }
