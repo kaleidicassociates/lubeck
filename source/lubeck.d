@@ -46,7 +46,7 @@ private alias BlasType(Iterators...) =
     CommonType!(staticMap!(IterationType, Iterators));
 
 /++
-General matrix-matrix multiplication.
+General matrix-matrix multiplication. Allocates result to an uninitialized slice using GC.
 Params:
     a = m(rows) x k(cols) matrix
     b = k(rows) x n(cols) matrix
@@ -115,7 +115,7 @@ unittest
 }
 
 /++
-General matrix-vector multiplication.
+General matrix-matrix multiplication. Allocates result to an uninitialized slice using GC.
 Params:
     a = m(rows) x k(cols) matrix
     b = k(rows) x 1(cols) vector
@@ -157,7 +157,7 @@ Slice!(Contiguous, [1], BlasType!(IteratorA, IteratorB)*)
 }
 
 /++
-General vector-matrix multiplication.
+General matrix-matrix multiplication.
 Params:
     a = 1(rows) x k(cols) vector
     b = k(rows) x n(cols) matrix
@@ -309,7 +309,7 @@ Params:
     matrix = input `M x N` matrix
     slim = If true the first `min(M,N)` columns of `u` and the first
         `min(M,N)` rows of `vt` are returned in the ndslices `u` and `vt`.
-Returns: $(LREF SvdResult)
+Returns: $(LREF SvdResult). Results are allocated by the GC.
 +/
 auto svd(
         Flag!"allowDestroy" allowDestroy = No.allowDestroy,
