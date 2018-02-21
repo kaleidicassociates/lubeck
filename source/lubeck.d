@@ -1202,20 +1202,11 @@ auto luDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
 {
     alias T = BlasType!Iterator;
     auto ipiv = uninitSlice!lapackint(min(a.length!0, a.length!1));
-
     auto b = a.transposed;
-    if(allowDestroy && b._stride!1 == 1)
-    {
-        auto m = b.assumeCanonical;
-        getrf(m, ipiv);
-        return LUResult!T(m, ipiv);
-    }
-    else
-    {
-        auto m = a.transposed.as!T.slice.canonical;
-        getrf(m, ipiv);
-        return LUResult!T(m, ipiv);
-    }
+    auto m = (allowDestroy && b._stride!1 == 1) ? b.assumeCanonical : a.transposed.as!T.slice.canonical;
+    
+    getrf(m, ipiv);
+    return LUResult!T(m, ipiv);
 }
 
 /++
@@ -1253,10 +1244,7 @@ body
     alias LU = BlasType!IteratorLU;
     alias B = BlasType!IteratorB;
     alias T = CommonType!(LU, B);
-    static if(is(T* == IteratorLU))
-        alias lut_ = lut;
-    else
-        auto lut_ = lut.as!T.slice.canonical;
+    auto lut_ = (is(T* == IteratorLU)) ? lut : lut.as!T.slice.canonical;
     
     //convect vector to matrix.
     static if(n[0] == 1)
@@ -1264,18 +1252,9 @@ body
     else
         auto k = b.transposed;
 
-    if(allowDestroy && k._stride!1 == 1 && is(IteratorB == T*))
-    {
-        auto m = k.assumeCanonical;
-        getrs!T(lut_, m, ipiv, trans);
-        return m.transposed;
-    }
-    else
-    {
-        auto m = k.as!T.slice.canonical;
-        getrs!T(lut_, m, ipiv, trans);
-        return m.transposed;
-    }
+    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    getrs!T(lut_, m, ipiv, trans);
+    return m.transposed;
 }
 
 unittest
@@ -1566,23 +1545,10 @@ body
     alias T = BlasType!Iterator;
     auto work = [T.sizeof * a.length].uninitSlice!T;
     auto ipiv = a.length.uninitSlice!lapackint;
+    auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.transposed.as!T.slice.canonical;
 
-    if(allowDestroy && a._stride!1 == 1)
-    {
-        import mir.ndslice.algorithm: eachUploPair;
-        auto m = a.assumeCanonical;
-        sytrf!T(m, ipiv, work, uplo);
-        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
-        return LDLResult!T(m, ipiv, uplo);
-    }
-    else
-    {
-        import mir.ndslice.algorithm: eachUploPair;
-        auto m = a.transposed.as!T.slice.canonical;
-        sytrf!T(m, ipiv, work, uplo);
-        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
-        return LDLResult!T(m, ipiv, uplo);
-    }
+    sytrf!T(m, ipiv, work, uplo);
+    return LDLResult!T(m, ipiv, uplo);
 }
 
 /++
@@ -1621,10 +1587,7 @@ body
     alias A = BlasType!IteratorA;
     alias B = BlasType!IteratorB;
     alias T = CommonType!(A, B);
-    static if(is(T* == IteratorA))
-        alias a_ = a;
-    else
-        auto a_ = a.as!T.slice.canonical;
+    auto a_ = (is(T* == IteratorA)) ? a : a.as!T.slice.canonical;
     
     //convect vector to matrix.
     static if(n[0] == 1)
@@ -1633,18 +1596,9 @@ body
         auto k = b.transposed;
 
     auto work = [T.sizeof * a.length].uninitSlice!T;
-    if(allowDestroy && k._stride!1 == 1 && is(IteratorB == T*))
-    {
-        auto m = k.assumeCanonical;
-        sytrs2!T(a_, m, ipiv, work, uplo);
-        return m.transposed;
-    }
-    else
-    {
-        auto m = k.as!T.slice.canonical;
-        sytrs2!T(a_, m, ipiv, work, uplo);
-        return m.transposed;
-    }
+    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    sytrs2!T(a_, m, ipiv, work, uplo);
+    return m.transposed;
 }
 
 ///
@@ -1767,22 +1721,10 @@ in
 }
 body
 {
-    import mir.ndslice.algorithm: eachUploPair;
     alias T = BlasType!Iterator;
-    if(allowDestroy && a._stride!1)
-    {
-        auto m = a.assumeCanonical;
-        potrf!T(m, uplo);
-        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
-        return choleskyResult!T(uplo, m);
-    }
-    else
-    {
-        auto m = a.as!T.slice.canonical;
-        potrf!T(m, uplo);
-        uplo == 'L' ? m.eachUploPair!"b = 0" : m.eachUploPair!"a = 0";
-        return choleskyResult!T(uplo, m);
-    }
+    auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
+    potrf!T(m, uplo);
+    return choleskyResult!T(uplo, m);
 }
 
 /++
@@ -1818,10 +1760,7 @@ body
     alias B = BlasType!IteratorB;
     alias C = BlasType!IteratorC;
     alias T = CommonType!(B, C);
-    static if(is(T* == IteratorC))
-        auto c_ = c;
-    else
-        auto c_ = c.as!T.slice.canonical;
+    auto c_ = (is(T* == IteratorC)) ? c : c.as!T.slice.canonical;
 
     //convect vector to matrix.
     static if(n[0] == 1)
@@ -1829,18 +1768,9 @@ body
     else
         auto k = b.transposed;
 
-    if(allowDestroy && k._stride!1 == 1 && is(IteratorB == T*))
-    {
-        auto m = k.assumeCanonical;
-        potrs!T(c_, m, uplo);
-        return m.transposed;
-    }
-    else
-    {
-        auto m = k.as!T.slice.canonical;
-        potrs!T(c_, m, uplo);
-        return m.transposed;
-    }
+    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    potrs!T(c_, m, uplo);
+    return m.transposed;
 }
 
 ///
