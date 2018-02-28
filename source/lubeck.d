@@ -50,7 +50,7 @@ General matrix-matrix multiplication.
 Params:
     a = m(rows) x k(cols) matrix
     b = k(rows) x n(cols) matrix
-Result:
+Result: 
     m(rows) x n(cols)
 +/
 Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
@@ -84,7 +84,6 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
                 return .mtimes(a, b.slice);
 
         auto c = uninitSlice!C(a.length!0, b.length!1);
-
         gemm(cast(C)1, a, b, cast(C)0, c);
 
         return c;
@@ -294,7 +293,7 @@ unittest
 ///
 struct SvdResult(T)
 {
-///
+    ///
 size_t potrf(T)(
     Slice!(Canonical, [2], T*) a,
     char uplo
@@ -319,7 +318,8 @@ size_t potrf(T)(
     ///if info < 0: if info == -i, the i-th argument had an illegal value.
     assert(info == 0);
     return info;
-}    ///
+}
+    ///
     Slice!(Contiguous, [2], T*) u;
     ///
     Slice!(Contiguous, [1], T*) sigma;
@@ -1508,7 +1508,9 @@ struct LDLResult(T)
     ///uplo = 'U': Upper triangle is stored;
     ///     = 'L': lower triangle is stored.
     char uplo;
-    ///Return solves a system of linear equations A * X = B, using LDL factorization.
+    ///Return solves a system of linear equations
+    ///    \A * X = B,
+    ///using LDL factorization.
     auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                SliceKind kindB, size_t[] n, IteratorB)
               (Slice!(kindB, n, IteratorB) b)
@@ -1690,7 +1692,9 @@ struct choleskyResult(T)
     ///contains the upper triangular part of the matrix A, and the
     ///strictly lower triangular part if A is not referenced.
     Slice!(Canonical, [2], T*) matrix;
-    ///Return solves a system of linear equations A * X = B, using Cholesky factorization.
+    ///Return solves a system of linear equations
+    ///    \A * X = B,
+    ///using Cholesky factorization.
     auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                SliceKind kind, size_t[] n, Iterator)
               (Slice!(kind, n, Iterator) b)
@@ -1722,6 +1726,7 @@ in
 body
 {
     alias T = BlasType!Iterator;
+    SvdResult!T p;
     auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
     potrf!T(m, uplo);
     return choleskyResult!T(uplo, m);
@@ -1844,3 +1849,186 @@ unittest
     import mir.ndslice.algorithm: all;
     assert(all!approxEqual(mtimes(A, X), B));
 }
+
+
+///
+struct QRResult(T)
+{
+    ///Matrix in witch the elements on and above the diagonal of the array contain the min(M, N) x N
+    ///upper trapezoidal matrix 'R' (R is upper triangular if m >= n). The elements below the
+    ///diagonal, with the array tau, represent the orthogonal matrix 'Q' as product of min(m, n).
+    Slice!(Canonical, [2], T*) matrix;
+    ///The scalar factors of the elementary reflectors
+    Slice!(Contiguous, [1], T*) tau;
+    ///Solve the least squares problem:
+    ///    \min ||A * X - B||
+    ///Using the QR factorization:
+    ///    \A = Q * R
+    ///computed by qrDecomp.
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, size_t[] n, Iterator)
+              (Slice!(kind, n, Iterator) b)
+    {
+        return qrSolve!(allowDestroy)(matrix, tau, b);
+    }
+}
+
+/++
+Computes a QR factorization of matrix 'a'.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = initial matrix
+Returns: $(LREF QRResult)
++/
+auto qrDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+              SliceKind kind, Iterator)
+             (Slice!(kind, [2], Iterator) a)
+{
+    alias T = BlasType!Iterator;
+    auto work = [T.sizeof * a.length].uninitSlice!T;
+    auto tau = (cast(int) min(a.length!0, a.length!1)).uninitSlice!T;
+    auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.transposed.as!T.slice.canonical;
+
+    geqrf!T(m, tau, work);
+    return QRResult!T(m, tau);
+}
+
+/++
+Solve the least squares problem:
+    \min ||A * X - B||
+Using the QR factorization:
+    \A = Q * R
+computed by qrDecomp.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = detalis of the QR factorization of the original matrix as returned by qrDecomp.
+    tau = details of the orhtogonal matrix Q.
+    b = right hand side matrix.
+Returns: solution matrix.
++/
+auto qrSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+             SliceKind kindB, size_t[] n, IteratorB, IteratorA, IteratorT)
+            (Slice!(Canonical, [2], IteratorA) a,
+             Slice!(Contiguous, [1], IteratorT) tau,
+             Slice!(kindB, n, IteratorB) b
+            )
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+    assert(a.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
+}
+body
+{
+    alias A = BlasType!IteratorA;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(A, B);
+    auto a_ = (is(T* == IteratorA)) ? a : a.as!T.slice.canonical;
+    auto tau_ = (is(T* == IteratorT)) ? tau : tau.as!T.slice.canonical;
+
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    auto work = [m.length!0].uninitSlice!T;
+    static if(is(T == double) || is(T == float))
+        ormqr!T(a_, tau_, m, work, 'L', 'T');
+    else
+        unmqr!T(a_, tau_, m, work, 'L', 'C');
+    trsm!T(Side.Left, Uplo.Upper, Diag.NonUnit, cast(T) 1.0, a_, m);
+
+    return m.transposed;
+}
+
+///
+unittest
+{
+    auto A =
+            [ 3,  1, -1,  2,
+             -5,  1,  3, -4,
+              2,  0,  1, -1,
+              1, -5,  3, -3 ]
+              .sliced(4, 4)
+              .as!double.slice;
+    import std.random;
+    import std.datetime: Clock;
+    auto rnd = Random(Clock.currTime().second);
+    auto m = uniform(0, 100, rnd);
+    auto B = uninitSlice!double(A.length!1, m);
+    foreach(i;0..B.length!0)
+        foreach(j;0..B.length!1)
+            B[i][j] = uniform(0, 100, rnd);
+
+    auto C = qrDecomp(A);
+    auto X = C.solve(B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
+}
+
+
+unittest
+{
+    auto A =
+            [ 3,  1, -1,  2,
+             -5,  1,  3, -4,
+              2,  0,  1, -1,
+              1, -5,  3, -3 ]
+              .sliced(4, 4)
+              .as!double.slice;
+    auto B = [ 6, -12, 1, 3 ].sliced(4).as!double.slice.canonical;
+    auto B_ = B.slice.sliced(B.length, 1);
+    auto C = qrDecomp(A);
+    auto X = qrSolve(C.matrix, C.tau, B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B_));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  0,
+              1,  0,  1,
+              0,  1,  1 ]
+              .sliced(3, 3)
+              .as!float.slice;
+
+    auto B =
+            [ 1,  1,  1,
+              1,  1,  1,
+              1,  1,  1 ]
+              .sliced(3, 3)
+              .as!float.slice;
+    auto C = qrDecomp(A);
+    auto X = qrSolve(C.matrix, C.tau, B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  0,
+              1,  0,  1,
+              0,  1,  1 ]
+              .sliced(3, 3)
+              .as!cdouble.slice;
+
+    auto B =
+            [ 1,  1,  1,
+              1,  1,  1,
+              1,  1,  1 ]
+              .sliced(3, 3)
+              .as!cdouble.slice;
+    auto C = qrDecomp(A);
+    auto X = qrSolve(C.matrix, C.tau, B);
+    auto res = mtimes(A, X);
+}
+
