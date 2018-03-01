@@ -88,7 +88,7 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
 
         static if(is(C == cdouble) || is(C == cfloat))
             gemm(cast(C)1, a, b, cast(C)0, c);
-        else if (a.length!1 == 1 && b.length!0 == 1 && !is(C == cdouble) && !is(C == cfloat))
+        else if (a.length!1 == 1 && b.length!0 == 1)
         {
             c[] = cast(C) 0;
             ger(cast(C)1, a.front!1, b.front, c);
