@@ -9,9 +9,9 @@ dependency "mir-random" version="~>0.4.3"
 
 buildType "unittest" {
 	buildOptions "unittests" "debugMode" "debugInfo"
-	libs "openblas"
+	libs "lapack" "blas"
 }
 buildType "unittest-cov" {
 	buildOptions "unittests" "coverage" "debugMode" "debugInfo"
-	libs "openblas"
+	libs "lapack" "blas"
 }
