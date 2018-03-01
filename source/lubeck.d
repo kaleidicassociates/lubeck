@@ -14,6 +14,7 @@ import mir.math.common;
 import std.traits;
 import std.meta;
 import std.typecons: Flag, Yes, No;
+import cblas : Diag;
 
 import mir.blas;
 import mir.lapack;
@@ -293,32 +294,6 @@ unittest
 ///
 struct SvdResult(T)
 {
-    ///
-size_t potrf(T)(
-    Slice!(Canonical, [2], T*) a,
-    char uplo
-    )
-{
-    assert(a.length!0 == a.length!1, "matrix must be squared");
-    import mir.ndslice.dynamic: transposed;
-    assert(a == a.transposed, "matrix must be symmetric");
-
-    lapackint n = cast(lapackint) a.length;
-    lapackint lda = cast(lapackint) a.length;
-    lapackint info = void;
-    char c_uplo = 'U';
-    if(uplo == 'U')
-        c_uplo = 'L';
-
-    lapack.potrf_(c_uplo, n, a.iterator, lda, info);
-
-    ///if info == 0: successful exit.
-    ///if info > 0: the leading minor of order i is not positive definite, and the
-    ///factorization could not be completed.
-    ///if info < 0: if info == -i, the i-th argument had an illegal value.
-    assert(info == 0);
-    return info;
-}
     ///
     Slice!(Contiguous, [2], T*) u;
     ///
@@ -1244,7 +1219,10 @@ body
     alias LU = BlasType!IteratorLU;
     alias B = BlasType!IteratorB;
     alias T = CommonType!(LU, B);
-    auto lut_ = (is(T* == IteratorLU)) ? lut : lut.as!T.slice.canonical;
+    static if(is(T* == IteratorLU))
+        auto lut_ = lut;
+    else
+        auto lut_ = lut.as!T.slice.canonical;
     
     //convect vector to matrix.
     static if(n[0] == 1)
@@ -1252,7 +1230,10 @@ body
     else
         auto k = b.transposed;
 
-    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
     getrs!T(lut_, m, ipiv, trans);
     return m.transposed;
 }
@@ -1287,6 +1268,7 @@ unittest
     assert(all!approxEqual(mtimes(A, m), B_));
 }
 
+///
 unittest
 {
     auto A =
@@ -1315,7 +1297,6 @@ unittest
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
 }
 
-///
 unittest
 {
     auto A =
@@ -1342,7 +1323,6 @@ unittest
     auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B.transposed);
     auto m2 = LU.solve(C);
 
-    
     import std.math: approxEqual;
     import mir.ndslice.algorithm: all;
     assert(all!approxEqual(mtimes(A, m), C));
@@ -1358,7 +1338,7 @@ unittest
           2,  4,  6,  3,  2,
           6,  8,  3,  5,  2 ]
             .sliced(5, 5)
-            .as!double.slice
+            .as!float.slice
             .canonical;
     auto B = [ 1,  1,  1,  1,  1 ].sliced(5).as!double.slice;
     auto C = B.slice.sliced(5, 1);
@@ -1383,7 +1363,7 @@ unittest
             .as!double.slice
             .canonical;
     auto B = [ 1,  1,  1,  1,  1,
-               1,  1,  1,  1,  1 ].sliced(5, 2).as!double.slice;
+               1,  1,  1,  1,  1 ].sliced(5, 2).as!float.slice;
 
     auto LU = A.luDecomp();
     auto m = luSolve(LU.lut, LU.ipiv, B);
@@ -1402,7 +1382,7 @@ unittest
           23,  14,  65,  35,  26,
           62,  28,  34,  51,  25 ]
             .sliced(5, 5)
-            .as!double.slice
+            .as!float.slice
             .universal;
     auto B =
         [ 1,  1,  1,  1,  1,
@@ -1443,7 +1423,7 @@ unittest
           1,  1,  1,  1,  1,
           1,  1,  1,  1,  1 ]
             .sliced(5, 5)
-            .as!double.slice
+            .as!float.slice
             .canonical;
 
     auto LU = A.luDecomp();
@@ -1589,7 +1569,10 @@ body
     alias A = BlasType!IteratorA;
     alias B = BlasType!IteratorB;
     alias T = CommonType!(A, B);
-    auto a_ = (is(T* == IteratorA)) ? a : a.as!T.slice.canonical;
+    static if(is(T* == IteratorA))
+        auto a_ = a;
+    else
+        auto a_ = a.as!T.slice.canonical;
     
     //convect vector to matrix.
     static if(n[0] == 1)
@@ -1598,7 +1581,10 @@ body
         auto k = b.transposed;
 
     auto work = [T.sizeof * a.length].uninitSlice!T;
-    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
     sytrs2!T(a_, m, ipiv, work, uplo);
     return m.transposed;
 }
@@ -1639,7 +1625,7 @@ unittest
          -1,  8, -5,
           2, -5,  7 ]
             .sliced(3, 3)
-            .as!double.slice
+            .as!float.slice
             .canonical;
     auto A_ = A.slice;
 
@@ -1669,7 +1655,7 @@ unittest
             .sliced(3, 3)
             .as!double.slice
             .canonical;
-    auto B = [ 1, 1, 1 ].sliced(3).as!double.slice.canonical;
+    auto B = [ 1, 1, 1 ].sliced(3).as!float.slice.canonical;
     auto B_ = B.sliced(3, 1);
 
     auto LDL = A.ldlDecomp('L');
@@ -1726,7 +1712,6 @@ in
 body
 {
     alias T = BlasType!Iterator;
-    SvdResult!T p;
     auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
     potrf!T(m, uplo);
     return choleskyResult!T(uplo, m);
@@ -1765,7 +1750,10 @@ body
     alias B = BlasType!IteratorB;
     alias C = BlasType!IteratorC;
     alias T = CommonType!(B, C);
-    auto c_ = (is(T* == IteratorC)) ? c : c.as!T.slice.canonical;
+    static if(is(T* == IteratorC))
+        auto c_ = c;
+    else
+        auto c_ = c.as!T.slice.canonical;
 
     //convect vector to matrix.
     static if(n[0] == 1)
@@ -1773,7 +1761,10 @@ body
     else
         auto k = b.transposed;
 
-    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
     potrs!T(c_, m, uplo);
     return m.transposed;
 }
@@ -1814,7 +1805,7 @@ unittest
              .sliced(3, 3)
              .as!double.slice
              .universal;
-    auto B = [ 1,  1,  1 ].sliced(3).as!double.slice;
+    auto B = [ 1,  1,  1 ].sliced(3).as!float.slice;
     auto C_ = B.slice.sliced(3, 1);
 
     auto C = A.choleskyDecomp('U');
@@ -1832,7 +1823,7 @@ unittest
              15,  55, 225,
              55, 225, 979 ]
              .sliced(3, 3)
-             .as!double.slice
+             .as!float.slice
              .canonical;
     auto B =
             [ 1,  1,
@@ -1922,8 +1913,14 @@ body
     alias A = BlasType!IteratorA;
     alias B = BlasType!IteratorB;
     alias T = CommonType!(A, B);
-    auto a_ = (is(T* == IteratorA)) ? a : a.as!T.slice.canonical;
-    auto tau_ = (is(T* == IteratorT)) ? tau : tau.as!T.slice.canonical;
+    static if(is(T* == IteratorA))
+        auto a_ = a;
+    else
+        auto a_ = a.as!T.slice.canonical;
+    static if(is(T* == IteratorT))
+        auto tau_ = tau;
+    else
+        auto tau_ = tau.as!T.slice.canonical;
 
     //convect vector to matrix.
     static if(n[0] == 1)
@@ -1931,13 +1928,16 @@ body
     else
         auto k = b.transposed;
 
-    auto m = (allowDestroy && k._stride!1 == 1 && is(IteratorB == T*)) ? k.assumeCanonical : k.as!T.slice.canonical;
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
     auto work = [m.length!0].uninitSlice!T;
     static if(is(T == double) || is(T == float))
         ormqr!T(a_, tau_, m, work, 'L', 'T');
     else
         unmqr!T(a_, tau_, m, work, 'L', 'C');
-    trsm!T(Side.Left, Uplo.Upper, Diag.NonUnit, cast(T) 1.0, a_, m);
+    trsm!T(Side.Right, Uplo.Lower, Diag.NonUnit, cast(T) 1.0, a_, m);
 
     return m.transposed;
 }
@@ -1978,7 +1978,7 @@ unittest
               2,  0,  1, -1,
               1, -5,  3, -3 ]
               .sliced(4, 4)
-              .as!double.slice;
+              .as!float.slice;
     auto B = [ 6, -12, 1, 3 ].sliced(4).as!double.slice.canonical;
     auto B_ = B.slice.sliced(B.length, 1);
     auto C = qrDecomp(A);
@@ -1996,7 +1996,7 @@ unittest
               1,  0,  1,
               0,  1,  1 ]
               .sliced(3, 3)
-              .as!float.slice;
+              .as!double.slice;
 
     auto B =
             [ 1,  1,  1,
@@ -2009,6 +2009,7 @@ unittest
 
     import std.math: approxEqual;
     import mir.ndslice.algorithm: all;
+    
     assert(all!approxEqual(mtimes(A, X), B));
 }
 
@@ -2026,9 +2027,13 @@ unittest
               1,  1,  1,
               1,  1,  1 ]
               .sliced(3, 3)
-              .as!cdouble.slice;
+              .as!cfloat.slice;
     auto C = qrDecomp(A);
     auto X = qrSolve(C.matrix, C.tau, B);
     auto res = mtimes(A, X);
+
+    import std.math: abs;
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => abs(a - b) < 1e-12)(res, B));
 }
 
