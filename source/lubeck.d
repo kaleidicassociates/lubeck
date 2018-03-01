@@ -47,7 +47,7 @@ private alias BlasType(Iterators...) =
     CommonType!(staticMap!(IterationType, Iterators));
 
 /++
-General matrix-matrix multiplication.
+General matrix-matrix multiplication. Allocates result to an uninitialized slice using GC.
 Params:
     a = m(rows) x k(cols) matrix
     b = k(rows) x n(cols) matrix
@@ -85,8 +85,16 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
                 return .mtimes(a, b.slice);
 
         auto c = uninitSlice!C(a.length!0, b.length!1);
-        gemm(cast(C)1, a, b, cast(C)0, c);
 
+        if (a.length!1 == 1 && b.length!0 == 1)
+        {
+            c[] = 0;
+            ger(cast(C)1, a.front!1, b.front, c);
+        }
+        else
+        {
+            gemm(cast(C)1, a, b, cast(C)0, c);
+        }
         return c;
     }
 }
@@ -114,8 +122,41 @@ unittest
         );
 }
 
+/// ger specialized case in mtimes
+unittest
+{
+    // from https://github.com/kaleidicassociates/lubeck/issues/8
+    {
+        auto a = [1.0f, 2.0f].sliced(2, 1);
+        auto b = [1.0f, 2.0f].sliced(2, 1);
+        assert(mtimes(a, b.transposed) == [[1, 2], [2, 4]]);
+    }
+    {
+        auto a = [1.0, 2.0].sliced(1, 2);
+        auto b = [1.0, 2.0].sliced(1, 2);
+        assert(mtimes(a.transposed, b) == [[1, 2], [2, 4]]);
+    }
+}
+
+///
+unittest
+{
+    // from https://github.com/kaleidicassociates/lubeck/issues/3
+    Slice!(cast(SliceKind)2, [2LU], float*) a = slice!float(1, 1);
+    Slice!(cast(SliceKind)0, [2LU], float*) b1 = slice!float(16, 1).transposed;
+    Slice!(cast(SliceKind)2, [2LU], float*) b2 = slice!float(1, 16);
+
+    a[] = 3;
+    b1[] = 4;
+    b2[] = 4;
+
+    // Confirm that this message does not appear
+    // Outputs: ** On entry to SGEMM  parameter number  8 had an illegal value
+    assert(a.mtimes(b1) == a.mtimes(b2));
+}
+
 /++
-General matrix-vector multiplication.
+General matrix-matrix multiplication. Allocates result to an uninitialized slice using GC.
 Params:
     a = m(rows) x k(cols) matrix
     b = k(rows) x 1(cols) vector
@@ -157,7 +198,7 @@ Slice!(Contiguous, [1], BlasType!(IteratorA, IteratorB)*)
 }
 
 /++
-General vector-matrix multiplication.
+General matrix-matrix multiplication.
 Params:
     a = 1(rows) x k(cols) vector
     b = k(rows) x n(cols) matrix
@@ -309,7 +350,7 @@ Params:
     matrix = input `M x N` matrix
     slim = If true the first `min(M,N)` columns of `u` and the first
         `min(M,N)` rows of `vt` are returned in the ndslices `u` and `vt`.
-Returns: $(LREF SvdResult)
+Returns: $(LREF SvdResult). Results are allocated by the GC.
 +/
 auto svd(
         Flag!"allowDestroy" allowDestroy = No.allowDestroy,
