@@ -14,4 +14,4 @@ script:
 addons:
   apt:
     packages:
-      - libatlas-base-dev
+      - libopenblas-dev
