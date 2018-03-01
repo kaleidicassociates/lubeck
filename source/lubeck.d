@@ -1166,12 +1166,16 @@ unittest
 ///LUResult consist lu factorization.
 struct LUResult(T)
 {
-    ///Matrix in witch lower triangular is L part of factorization
-    ///(diagonal elements of L are not stored), upper triangular
-    ///is U part of factorization.
+    /++
+    Matrix in witch lower triangular is L part of factorization
+    (diagonal elements of L are not stored), upper triangular
+    is U part of factorization.
+    +/
     Slice!(Canonical, [2], T*) lut;
-    ///The pivot indices, for 1 <= i <= min(M,N), row i of the matrix
-    ///was interchanged with row ipiv(i).
+    /++
+    The pivot indices, for 1 <= i <= min(M,N), row i of the matrix
+    was interchanged with row ipiv(i).
+    +/
     Slice!(Contiguous, [1], lapackint*) ipiv;
     ///L part of the factorization.
     auto l() @property
@@ -1322,14 +1326,11 @@ unittest
             .as!double.slice
             .canonical;
     
-    import std.random;
-    import std.datetime: Clock;
-    auto rnd = Random(Clock.currTime().second);
-    auto m = uniform(0, 100, rnd);
-    auto B = uninitSlice!double(A.length!1, m);
-    foreach(i;0..B.length!0)
-        foreach(j;0..B.length!1)
-            B[i][j] = uniform(0, 100, rnd);
+
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 5, 20);
     
     auto LU = A.luDecomp();
     auto X = LU.solve(B);
@@ -1349,15 +1350,10 @@ unittest
             .sliced(5, 5)
             .as!double.slice
             .canonical;
-    auto B =
-        [ 1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1 ]
-            .sliced(5, 5)
-            .as!double.slice
-            .universal;
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 5, 5);
     auto C = B.slice;
 
     auto LU = A.luDecomp();
@@ -1366,7 +1362,7 @@ unittest
 
     import std.math: approxEqual;
     import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, m), C));
+    assert(all!approxEqual(mtimes(A, m), C.transposed));
     assert(all!approxEqual(mtimes(A, m2), C));
 }
 
@@ -1381,7 +1377,7 @@ unittest
             .sliced(5, 5)
             .as!float.slice
             .canonical;
-    auto B = [ 1,  1,  1,  1,  1 ].sliced(5).as!double.slice;
+    auto B = [ 1,  2,  3,  4,  5 ].sliced(5).as!double.slice;
     auto C = B.slice.sliced(5, 1);
 
     auto LU = A.luDecomp();
@@ -1403,8 +1399,10 @@ unittest
             .sliced(5, 5)
             .as!double.slice
             .canonical;
-    auto B = [ 1,  1,  1,  1,  1,
-               1,  1,  1,  1,  1 ].sliced(5, 2).as!float.slice;
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 5, 2);
 
     auto LU = A.luDecomp();
     auto m = luSolve(LU.lut, LU.ipiv, B);
@@ -1425,14 +1423,11 @@ unittest
             .sliced(5, 5)
             .as!float.slice
             .universal;
-    auto B =
-        [ 1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1 ]
-            .sliced(5, 5)
-            .as!double.slice;
+    
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 5, 5);
     auto B2 = B.slice;
     auto C = B.slice;
 
@@ -1457,15 +1452,11 @@ unittest
             .sliced(5, 5)
             .as!double.slice
             .universal;
-    auto B =
-        [ 1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1,
-          1,  1,  1,  1,  1 ]
-            .sliced(5, 5)
-            .as!float.slice
-            .canonical;
+    
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!float(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 5, 5);
 
     auto LU = A.luDecomp();
     auto m = luSolve(LU.lut, LU.ipiv, B);
@@ -1516,22 +1507,30 @@ unittest
 ///Consist LDL factorization;
 struct LDLResult(T)
 {
-    ///Matrix in witch lower triangular matrix is 'L' part of
-    ///factorization, diagonal is 'D' part.
+    /++
+    Matrix in witch lower triangular matrix is 'L' part of
+    factorization, diagonal is 'D' part.
+    +/
     Slice!(Canonical, [2], T*) matrix;
-    ///The pivot indices.
-    ///If ipiv(k) > 0, then rows and columns k and ipiv(k) were
-    ///interchanged and D(k, k) is a '1 x 1' diagonal block.
-    ///If ipiv(k) = ipiv(k + 1) < 0, then rows and columns k+1 and
-    ///-ipiv(k) were interchanged and D(k:k+1, k:k+1) is a '2 x 2'
-    ///diagonal block.
+    /++
+    The pivot indices.
+    If ipiv(k) > 0, then rows and columns k and ipiv(k) were
+    interchanged and D(k, k) is a '1 x 1' diagonal block.
+    If ipiv(k) = ipiv(k + 1) < 0, then rows and columns k+1 and
+    -ipiv(k) were interchanged and D(k:k+1, k:k+1) is a '2 x 2'
+    diagonal block.
+    +/
     Slice!(Contiguous, [1], lapackint*) ipiv;
-    ///uplo = 'U': Upper triangle is stored;
-    ///     = 'L': lower triangle is stored.
+    /++
+    uplo = 'U': Upper triangle is stored;
+         = 'L': lower triangle is stored.
+    +/
     char uplo;
-    ///Return solves a system of linear equations
-    ///    \A * X = B,
-    ///using LDL factorization.
+    /++
+    Return solves a system of linear equations
+        \A * X = B,
+    using LDL factorization.
+    +/
     auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                SliceKind kindB, size_t[] n, IteratorB)
               (Slice!(kindB, n, IteratorB) b)
@@ -1642,14 +1641,10 @@ unittest
             .as!double.slice
             .canonical;
 
-    import std.random;
-    import std.datetime: Clock;
-    auto rnd = Random(Clock.currTime().second);
-    auto m = uniform(0, 100, rnd);
-    auto B = uninitSlice!double(A.length!1, m);
-    foreach(i;0..B.length!0)
-        foreach(j;0..B.length!1)
-            B[i][j] = uniform(0, 100, rnd);
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 4, 50);
 
     auto LDL = A.ldlDecomp('L');
     auto X = LDL.solve(B);
@@ -1670,13 +1665,10 @@ unittest
             .canonical;
     auto A_ = A.slice;
 
-    auto B =
-        [ 1,  1,  1,
-          1,  1,  1,
-          1,  1,  1 ]
-          .sliced(3, 3)
-          .as!double.slice
-          .canonical;
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 3, 3);
     auto B_ = B.slice;
 
     auto LDL = A.ldlDecomp!(Yes.allowDestroy)('L');
@@ -1684,7 +1676,7 @@ unittest
 
     import std.math: approxEqual;
     import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A_, X), B_));
+    assert(all!approxEqual(mtimes(A_, X), B_.transposed));
 }
 
 unittest
@@ -1696,7 +1688,7 @@ unittest
             .sliced(3, 3)
             .as!double.slice
             .canonical;
-    auto B = [ 1, 1, 1 ].sliced(3).as!float.slice.canonical;
+    auto B = [ 1, 5, 10 ].sliced(3).as!float.slice.canonical;
     auto B_ = B.sliced(3, 1);
 
     auto LDL = A.ldlDecomp('L');
@@ -1709,19 +1701,25 @@ unittest
 
 struct choleskyResult(T)
 {
-    ///If uplo = 'L': lower triangle of 'matrix' is stored.
-    ///If uplo = 'U': upper triangle of 'matrix' is stored.
+    /++
+    If uplo = 'L': lower triangle of 'matrix' is stored.
+    If uplo = 'U': upper triangle of 'matrix' is stored.
+    +/
     char uplo;
-    ///if uplo = Lower, the leading 'N x N' lower triangular part of A
-    ///contains the lower triangular part of the matrix A, and the
-    ///strictly upper triangular part if A is not referenced.
-    ///if uplo = Upper, the leading 'N x N' upper triangular part of A
-    ///contains the upper triangular part of the matrix A, and the
-    ///strictly lower triangular part if A is not referenced.
+    /++
+    if uplo = Lower, the leading 'N x N' lower triangular part of A
+    contains the lower triangular part of the matrix A, and the
+    strictly upper triangular part if A is not referenced.
+    if uplo = Upper, the leading 'N x N' upper triangular part of A
+    contains the upper triangular part of the matrix A, and the
+    strictly lower triangular part if A is not referenced.
+    +/
     Slice!(Canonical, [2], T*) matrix;
-    ///Return solves a system of linear equations
-    ///    \A * X = B,
-    ///using Cholesky factorization.
+    /++
+    Return solves a system of linear equations
+        \A * X = B,
+    using Cholesky factorization.
+    +/
     auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                SliceKind kind, size_t[] n, Iterator)
               (Slice!(kind, n, Iterator) b)
@@ -1820,14 +1818,10 @@ unittest
              .sliced(3, 3)
              .as!double.slice;
     
-    import std.random;
-    import std.datetime: Clock;
-    auto rnd = Random(Clock.currTime().second);
-    auto m = uniform(0, 100, rnd);
-    auto B = uninitSlice!double(A.length!1, m);
-    foreach(i;0..B.length!0)
-        foreach(j;0..B.length!1)
-            B[i][j] = uniform(0, 100, rnd);
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 3, 100);
 
     auto C = A.choleskyDecomp('L');
     auto X = C.solve(B);
@@ -1846,7 +1840,7 @@ unittest
              .sliced(3, 3)
              .as!double.slice
              .universal;
-    auto B = [ 1,  1,  1 ].sliced(3).as!float.slice;
+    auto B = [ 10,  5,  1 ].sliced(3).as!float.slice;
     auto C_ = B.slice.sliced(3, 1);
 
     auto C = A.choleskyDecomp('U');
@@ -1866,13 +1860,10 @@ unittest
              .sliced(3, 3)
              .as!float.slice
              .canonical;
-    auto B =
-            [ 1,  1,
-              1,  1,
-              1,  1 ]
-              .sliced(3, 2)
-              .as!double.slice
-              .universal;
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 3, 2);
 
     auto C = A.choleskyDecomp('L');
     auto X = choleskySolve(C.matrix, B, C.uplo);
@@ -1886,17 +1877,21 @@ unittest
 ///
 struct QRResult(T)
 {
-    ///Matrix in witch the elements on and above the diagonal of the array contain the min(M, N) x N
-    ///upper trapezoidal matrix 'R' (R is upper triangular if m >= n). The elements below the
-    ///diagonal, with the array tau, represent the orthogonal matrix 'Q' as product of min(m, n).
+    /++
+    Matrix in witch the elements on and above the diagonal of the array contain the min(M, N) x N
+    upper trapezoidal matrix 'R' (R is upper triangular if m >= n). The elements below the
+    diagonal, with the array tau, represent the orthogonal matrix 'Q' as product of min(m, n).
+    +/
     Slice!(Canonical, [2], T*) matrix;
     ///The scalar factors of the elementary reflectors
     Slice!(Contiguous, [1], T*) tau;
-    ///Solve the least squares problem:
-    ///    \min ||A * X - B||
-    ///Using the QR factorization:
-    ///    \A = Q * R
-    ///computed by qrDecomp.
+    /++
+    Solve the least squares problem:
+        \min ||A * X - B||
+    Using the QR factorization:
+        \A = Q * R
+    computed by qrDecomp.
+    +/
     auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
                SliceKind kind, size_t[] n, Iterator)
               (Slice!(kind, n, Iterator) b)
@@ -1993,14 +1988,10 @@ unittest
               1, -5,  3, -3 ]
               .sliced(4, 4)
               .as!double.slice;
-    import std.random;
-    import std.datetime: Clock;
-    auto rnd = Random(Clock.currTime().second);
-    auto m = uniform(0, 100, rnd);
-    auto B = uninitSlice!double(A.length!1, m);
-    foreach(i;0..B.length!0)
-        foreach(j;0..B.length!1)
-            B[i][j] = uniform(0, 100, rnd);
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!double(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 4, 50);
 
     auto C = qrDecomp(A);
     auto X = C.solve(B);
@@ -2039,12 +2030,10 @@ unittest
               .sliced(3, 3)
               .as!double.slice;
 
-    auto B =
-            [ 1,  1,  1,
-              1,  1,  1,
-              1,  1,  1 ]
-              .sliced(3, 3)
-              .as!float.slice;
+    import mir.random.algorithm;
+    import mir.random.variable: NormalVariable;
+    auto var = NormalVariable!float(0, 1);
+    auto B = threadLocalPtr!Random.randomSlice(var, 3, 3);
     auto C = qrDecomp(A);
     auto X = qrSolve(C.matrix, C.tau, B);
 
@@ -2064,9 +2053,9 @@ unittest
               .as!cdouble.slice;
 
     auto B =
-            [ 1,  1,  1,
-              1,  1,  1,
-              1,  1,  1 ]
+            [ 5,  8,  18,
+              4,  5,  15,
+              3,  2,  19 ]
               .sliced(3, 3)
               .as!cfloat.slice;
     auto C = qrDecomp(A);
@@ -2075,6 +2064,6 @@ unittest
 
     import std.math: abs;
     import mir.ndslice.algorithm: equal;
-    //assert(equal!((a, b) => abs(a - b) < 1e-12)(res, B));
+    assert(equal!((a, b) => abs(a - b) < 1e-12)(res, B));
 }
 

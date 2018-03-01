@@ -5,6 +5,7 @@ copyright "Copyright © 2017, Symmetry Investments & Kaleidic Associates; Copyri
 license "BSL-1.0"
 dependency "mir-lapack" version="~>0.0.7-alpha"
 dependency "mir-blas" version="~>0.1.2-alpha3"
+dependency "mir-random" version="~>0.4.3"
 
 buildType "unittest" {
 	buildOptions "unittests" "debugMode" "debugInfo"
