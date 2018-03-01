@@ -1295,11 +1295,11 @@ unittest
             .as!double.slice
             .canonical;
     auto B =
-        [ 1,  1,  1,  1,  0,  0,  0,
-          1,  1,  1,  1,  0,  0,  0,
-          1,  1,  1,  1,  0,  0,  0,
-          1,  1,  1,  1,  0,  0,  0,
-          1,  1,  1,  1,  0,  0,  0 ]
+        [ 1,  3,  4,  8,  0,  0,  0,
+          2,  1,  7,  1,  0,  0,  0,
+          3,  5,  7,  7,  0,  0,  0,
+          4,  4,  9,  8,  0,  0,  0,
+          5,  5,  8,  1,  0,  0,  0 ]
             .sliced(5, 7)
             .as!double.slice
             .universal;
@@ -1326,11 +1326,9 @@ unittest
             .as!double.slice
             .canonical;
     
-
+    import mir.random.variable;
     import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 5, 20);
+    auto B = randomSlice!double(uniformVar(-100, 100), 5, 100);
     
     auto LU = A.luDecomp();
     auto X = LU.solve(B);
@@ -1350,10 +1348,15 @@ unittest
             .sliced(5, 5)
             .as!double.slice
             .canonical;
-    import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 5, 5);
+    auto B =
+        [ 2,  8,  3,  5,  8,
+          8,  1,  4,  9,  86,
+          1,  6,  7,  1,  67,
+          6,  1,  5,  4,  45,
+          1,  2,  3,  1,  11 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .universal;
     auto C = B.slice;
 
     auto LU = A.luDecomp();
@@ -1399,10 +1402,8 @@ unittest
             .sliced(5, 5)
             .as!double.slice
             .canonical;
-    import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 5, 2);
+    auto B = [ 1,  15,  4,  5,  8,
+               3,  20,  1,  9,  11 ].sliced(5, 2).as!float.slice;
 
     auto LU = A.luDecomp();
     auto m = luSolve(LU.lut, LU.ipiv, B);
@@ -1423,11 +1424,14 @@ unittest
             .sliced(5, 5)
             .as!float.slice
             .universal;
-    
-    import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 5, 5);
+    auto B =
+        [ 6,  1,  3,  1,  11,
+         12,  5,  7,  6,  78,
+          8,  4,  1,  5,  54,
+          3,  1,  8,  1,  45,
+          1,  6,  8,  6,  312 ]
+            .sliced(5, 5)
+            .as!double.slice;
     auto B2 = B.slice;
     auto C = B.slice;
 
@@ -1452,11 +1456,15 @@ unittest
             .sliced(5, 5)
             .as!double.slice
             .universal;
-    
-    import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!float(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 5, 5);
+    auto B =
+        [ 5,  7,  8,  3,  78,
+          1,  2,  5,  4,  5,
+          2,  4,  1,  5,  15,
+          1,  1,  4,  1,  154,
+          1,  3,  1,  8,  17 ]
+            .sliced(5, 5)
+            .as!float.slice
+            .canonical;
 
     auto LU = A.luDecomp();
     auto m = luSolve(LU.lut, LU.ipiv, B);
@@ -1641,10 +1649,9 @@ unittest
             .as!double.slice
             .canonical;
 
+    import mir.random.variable;
     import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 4, 50);
+    auto B = randomSlice!double(uniformVar(-100, 100), 4, 100);
 
     auto LDL = A.ldlDecomp('L');
     auto X = LDL.solve(B);
@@ -1665,10 +1672,13 @@ unittest
             .canonical;
     auto A_ = A.slice;
 
-    import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 3, 3);
+    auto B =
+        [ 5,  7,  1,
+          1,  8,  5,
+          9,  3,  2 ]
+          .sliced(3, 3)
+          .as!double.slice
+          .canonical;
     auto B_ = B.slice;
 
     auto LDL = A.ldlDecomp!(Yes.allowDestroy)('L');
@@ -1688,7 +1698,7 @@ unittest
             .sliced(3, 3)
             .as!double.slice
             .canonical;
-    auto B = [ 1, 5, 10 ].sliced(3).as!float.slice.canonical;
+    auto B = [ 1, 4, 7 ].sliced(3).as!float.slice.canonical;
     auto B_ = B.sliced(3, 1);
 
     auto LDL = A.ldlDecomp('L');
@@ -1818,10 +1828,9 @@ unittest
              .sliced(3, 3)
              .as!double.slice;
     
+    import mir.random.variable;
     import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 3, 100);
+    auto B = randomSlice!double(uniformVar(-100, 100), 3, 100);
 
     auto C = A.choleskyDecomp('L');
     auto X = C.solve(B);
@@ -1840,7 +1849,7 @@ unittest
              .sliced(3, 3)
              .as!double.slice
              .universal;
-    auto B = [ 10,  5,  1 ].sliced(3).as!float.slice;
+    auto B = [ 10,  157,  80 ].sliced(3).as!float.slice;
     auto C_ = B.slice.sliced(3, 1);
 
     auto C = A.choleskyDecomp('U');
@@ -1860,10 +1869,13 @@ unittest
              .sliced(3, 3)
              .as!float.slice
              .canonical;
-    import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 3, 2);
+    auto B =
+            [ 7,  3,
+              2,  1,
+              1,  8 ]
+              .sliced(3, 2)
+              .as!double.slice
+              .universal;
 
     auto C = A.choleskyDecomp('L');
     auto X = choleskySolve(C.matrix, B, C.uplo);
@@ -1988,10 +2000,10 @@ unittest
               1, -5,  3, -3 ]
               .sliced(4, 4)
               .as!double.slice;
+
+    import mir.random.variable;
     import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!double(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 4, 50);
+    auto B = randomSlice!double(uniformVar(-100, 100), 4, 100);
 
     auto C = qrDecomp(A);
     auto X = C.solve(B);
@@ -2030,10 +2042,12 @@ unittest
               .sliced(3, 3)
               .as!double.slice;
 
-    import mir.random.algorithm;
-    import mir.random.variable: NormalVariable;
-    auto var = NormalVariable!float(0, 1);
-    auto B = threadLocalPtr!Random.randomSlice(var, 3, 3);
+    auto B =
+            [ 7,  6,  98,
+              4,  8,  17,
+              5,  3,  24 ]
+              .sliced(3, 3)
+              .as!float.slice;
     auto C = qrDecomp(A);
     auto X = qrSolve(C.matrix, C.tau, B);
 
@@ -2053,9 +2067,9 @@ unittest
               .as!cdouble.slice;
 
     auto B =
-            [ 5,  8,  18,
-              4,  5,  15,
-              3,  2,  19 ]
+            [ 15,  78,  11,
+              21,  47,  71,
+              81,  11,  81 ]
               .sliced(3, 3)
               .as!cfloat.slice;
     auto C = qrDecomp(A);

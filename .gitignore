@@ -20,7 +20,4 @@ lubeck-test-library
 *.lst
 .vscode
 *.directory
-source/*.directory
-example/*.directory
-example/source/*.directory
 *.sublime-workspace
