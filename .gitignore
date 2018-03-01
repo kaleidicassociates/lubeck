@@ -21,4 +21,6 @@ lubeck-test-library
 .vscode
 *.directory
 source/*.directory
+example/*.directory
+example/source/*.directory
 *.sublime-workspace
