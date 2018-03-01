@@ -19,6 +19,10 @@ if A is not a square matrix.
  - `pinv` - Moore-Penrose pseudoinverse of matrix.
  - `det`/`detSymmetric` - General/symmetric matrix determinant.
  - `eigSymmetric` - Eigenvalues and eigenvectors of symmetric matrix.
+ - Qr decomposition: `qrDecomp` with `solve` method
+ - Cholesky: `choleskyDecomp` with `solve` method
+ - LU decomposition: `luDecomp` with `solve` method
+ - LDL decomposition: `ldlDecomp` with `solve` method
 
 ## Example
 
