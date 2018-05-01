@@ -692,7 +692,7 @@ Computes Moore-Penrose pseudoinverse of matrix.
 
 Params:
     matrix = Input `M x N` matrix.
-    tolerance = The computation is based on AVD and any singular values less than tolerance are treated as zero.
+    tolerance = The computation is based on SVD and any singular values less than tolerance are treated as zero.
 Returns: Moore-Penrose pseudoinverse matrix
 +/
 Slice!(Contiguous, [2], BlasType!Iterator*)
