@@ -14,6 +14,7 @@ import mir.math.common;
 import std.traits;
 import std.meta;
 import std.typecons: Flag, Yes, No;
+import cblas : Diag;
 
 import mir.blas;
 import mir.lapack;
@@ -46,11 +47,11 @@ private alias BlasType(Iterators...) =
     CommonType!(staticMap!(IterationType, Iterators));
 
 /++
-General matrix-matrix multiplication.
+General matrix-matrix multiplication. Allocates result to an uninitialized slice using GC.
 Params:
     a = m(rows) x k(cols) matrix
     b = k(rows) x n(cols) matrix
-Result:
+Result: 
     m(rows) x n(cols)
 +/
 Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
@@ -85,8 +86,15 @@ Slice!(Contiguous, [2], BlasType!(IteratorA, IteratorB)*)
 
         auto c = uninitSlice!C(a.length!0, b.length!1);
 
-        gemm(cast(C)1, a, b, cast(C)0, c);
-
+        if (a.length!1 == 1 && b.length!0 == 1)
+        {
+            c[] = cast(C) 0;
+            ger(cast(C)1, a.front!1, b.front, c);
+        }
+        else
+        {
+            gemm(cast(C)1, a, b, cast(C)0, c);
+        }
         return c;
     }
 }
@@ -114,8 +122,41 @@ unittest
         );
 }
 
+/// ger specialized case in mtimes
+unittest
+{
+    // from https://github.com/kaleidicassociates/lubeck/issues/8
+    {
+        auto a = [1.0f, 2.0f].sliced(2, 1);
+        auto b = [1.0f, 2.0f].sliced(2, 1);
+        assert(mtimes(a, b.transposed) == [[1, 2], [2, 4]]);
+    }
+    {
+        auto a = [1.0, 2.0].sliced(1, 2);
+        auto b = [1.0, 2.0].sliced(1, 2);
+        assert(mtimes(a.transposed, b) == [[1, 2], [2, 4]]);
+    }
+}
+
+///
+unittest
+{
+    // from https://github.com/kaleidicassociates/lubeck/issues/3
+    Slice!(cast(SliceKind)2, [2LU], float*) a = slice!float(1, 1);
+    Slice!(cast(SliceKind)0, [2LU], float*) b1 = slice!float(16, 1).transposed;
+    Slice!(cast(SliceKind)2, [2LU], float*) b2 = slice!float(1, 16);
+
+    a[] = 3;
+    b1[] = 4;
+    b2[] = 4;
+
+    // Confirm that this message does not appear
+    // Outputs: ** On entry to SGEMM  parameter number  8 had an illegal value
+    assert(a.mtimes(b1) == a.mtimes(b2));
+}
+
 /++
-General matrix-vector multiplication.
+General matrix-matrix multiplication. Allocates result to an uninitialized slice using GC.
 Params:
     a = m(rows) x k(cols) matrix
     b = k(rows) x 1(cols) vector
@@ -157,7 +198,7 @@ Slice!(Contiguous, [1], BlasType!(IteratorA, IteratorB)*)
 }
 
 /++
-General vector-matrix multiplication.
+General matrix-matrix multiplication.
 Params:
     a = 1(rows) x k(cols) vector
     b = k(rows) x n(cols) matrix
@@ -309,7 +350,7 @@ Params:
     matrix = input `M x N` matrix
     slim = If true the first `min(M,N)` columns of `u` and the first
         `min(M,N)` rows of `vt` are returned in the ndslices `u` and `vt`.
-Returns: $(LREF SvdResult)
+Returns: $(LREF SvdResult). Results are allocated by the GC.
 +/
 auto svd(
         Flag!"allowDestroy" allowDestroy = No.allowDestroy,
@@ -651,7 +692,7 @@ Computes Moore-Penrose pseudoinverse of matrix.
 
 Params:
     matrix = Input `M x N` matrix.
-    tolerance = The computation is based on AVD and any singular values less than tolerance are treated as zero.
+    tolerance = The computation is based on SVD and any singular values less than tolerance are treated as zero.
 Returns: Moore-Penrose pseudoinverse matrix
 +/
 Slice!(Contiguous, [2], BlasType!Iterator*)
@@ -1025,3 +1066,1018 @@ unittest
         assert(eigr.vectors[i].approxEqual(test[i]) ||
             eigr.vectors[i].map!"-a".approxEqual(test[i]));
 }
+
+version (unittest)
+{
+/++
+Swaps rows of input matrix
+Params
+    ipiv = pivot points
+Returns:
+    a = shifted matrix
++/
+    private void moveRows(SliceKind kind, Iterator)
+                        (Slice!(kind, [2], Iterator) a,
+                        Slice!(Contiguous, [1], lapackint*) ipiv)
+    {
+        import mir.ndslice.algorithm: each;
+        foreach_reverse(i;0..ipiv.length)
+        {
+            if(ipiv[i] == i + 1)
+                continue;
+            each!swap(a[i], a[ipiv[i] - 1]);
+        }
+    }
+}
+
+///
+unittest
+{
+    auto A = 
+           [ 9,  9,  9,
+             8,  8,  8,
+             7,  7,  7,
+             6,  6,  6,
+             5,  5,  5,
+             4,  4,  4,
+             3,  3,  3,
+             2,  2,  2,
+             1,  1,  1,
+             0,  0,  0 ]
+             .sliced(10, 3)
+             .as!double.slice;
+    auto ipiv = [ 10, 9, 8, 7, 6, 6, 7, 8, 9, 10 ].sliced(10);
+    moveRows(A, ipiv);
+
+    auto B = 
+           [ 0,  0,  0,
+             1,  1,  1,
+             2,  2,  2,
+             3,  3,  3,
+             4,  4,  4,
+             5,  5,  5,
+             6,  6,  6,
+             7,  7,  7,
+             8,  8,  8,
+             9,  9,  9 ]
+             .sliced(10, 3)
+             .as!double.slice;
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(B, A));
+}
+
+unittest
+{
+    auto A = 
+           [ 1,  1,  1,
+             2,  2,  2,
+             3,  3,  3,
+             4,  4,  4,
+             5,  5,  5,
+             6,  6,  6,
+             7,  7,  7,
+             8,  8,  8,
+             9,  9,  9,
+             0,  0,  0 ]
+             .sliced(10, 3)
+             .as!double.slice;
+    auto ipiv = [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 10 ].sliced(10);
+    moveRows(A, ipiv);
+    
+    auto B = 
+           [ 0,  0,  0,
+             1,  1,  1,
+             2,  2,  2,
+             3,  3,  3,
+             4,  4,  4,
+             5,  5,  5,
+             6,  6,  6,
+             7,  7,  7,
+             8,  8,  8,
+             9,  9,  9 ]
+             .sliced(10, 3)
+             .as!double.slice;
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(B, A));
+}
+
+///LUResult consist lu factorization.
+struct LUResult(T)
+{
+    /++
+    Matrix in witch lower triangular is L part of factorization
+    (diagonal elements of L are not stored), upper triangular
+    is U part of factorization.
+    +/
+    Slice!(Canonical, [2], T*) lut;
+    /++
+    The pivot indices, for 1 <= i <= min(M,N), row i of the matrix
+    was interchanged with row ipiv(i).
+    +/
+    Slice!(Contiguous, [1], lapackint*) ipiv;
+    ///L part of the factorization.
+    auto l() @property
+    {
+        import mir.ndslice.algorithm: eachUpper;
+        auto l = lut.transposed[0..lut.length!1, 0..min(lut.length!0, lut.length!1)].slice.canonical;
+        l.eachUpper!"a = 0";
+        l.diagonal[] = 1;
+        return l;
+    }
+    ///U part of the factorization.
+    auto u() @property
+    {
+        import mir.ndslice.algorithm: eachLower;
+        auto u = lut.transposed[0..min(lut.length!0, lut.length!1), 0..lut.length!0].slice.canonical;
+        u.eachLower!"a = 0";
+        return u;
+    }
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, size_t[] n, Iterator)
+              (Slice!(kind, n, Iterator) b,
+               char trans = 'N')
+    {
+        return luSolve!(allowDestroy)(lut, ipiv, b, trans);
+    }
+}
+
+/++
+Computes LU factorization of a general 'M x N' matrix 'A' using partial
+pivoting with row interchanges.
+The factorization has the form:
+    \A = P * L * U
+Where P is a permutation matrix, L is lower triangular with unit
+diagonal elements (lower trapezoidal if m > n), and U is upper
+triangular (upper trapezoidal if m < n).
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = input 'M x N' matrix for factorization.
+Returns: $(LREF LUResalt)
++/
+auto luDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+              SliceKind kind, Iterator)
+             (Slice!(kind, [2], Iterator) a)
+{
+    alias T = BlasType!Iterator;
+    auto ipiv = uninitSlice!lapackint(min(a.length!0, a.length!1));
+    auto b = a.transposed;
+    auto m = (allowDestroy && b._stride!1 == 1) ? b.assumeCanonical : a.transposed.as!T.slice.canonical;
+    
+    getrf(m, ipiv);
+    return LUResult!T(m, ipiv);
+}
+
+/++
+Solves a system of linear equations
+    \A * X = B, or
+    \A**T * X = B
+with a general 'N x N' matrix 'A' using the LU factorization computed by luDecomp.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    lut = factorization of matrix 'A', A = P * L * U.
+    ipiv = the pivot indices from luDecomp.
+    b = the right hand side matrix B.
+    trans = specifies the form of the system of equations:
+          = 'N': A * X = B (No transpose)
+          = 'T': A**T * X = B (Transpose)
+          = 'C': A**T * X = B (Conjugate transpose = Transpose)
+Returns:
+    Return solve of the system linear equations.
++/
+auto luSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+           SliceKind kindB, size_t[] n, IteratorB, IteratorLU)
+          (Slice!(Canonical, [2], IteratorLU) lut,
+           Slice!(Contiguous, [1], lapackint*) ipiv,
+           Slice!(kindB, n, IteratorB) b,
+           char trans = 'N'
+          )
+in
+{
+    assert(lut.length!0 == lut.length!1, "matrix must be squared");
+    assert(ipiv.length == lut.length, "size of ipiv must be equal to the number of rows a");
+    assert(lut.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
+}
+body
+{
+    alias LU = BlasType!IteratorLU;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(LU, B);
+    static if(is(T* == IteratorLU))
+        auto lut_ = lut;
+    else
+        auto lut_ = lut.as!T.slice.canonical;
+    
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
+    getrs!T(lut_, m, ipiv, trans);
+    return m.transposed;
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto B =
+        [ 1,  3,  4,  8,  0,  0,  0,
+          2,  1,  7,  1,  0,  0,  0,
+          3,  5,  7,  7,  0,  0,  0,
+          4,  4,  9,  8,  0,  0,  0,
+          5,  5,  8,  1,  0,  0,  0 ]
+            .sliced(5, 7)
+            .as!double.slice
+            .universal;
+
+    auto B_ = B[0..$, 0..4];
+    auto LU = A.luDecomp();
+    auto m = luSolve(LU.lut, LU.ipiv, B_);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), B_));
+}
+
+///
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    
+    import mir.random.variable;
+    import mir.random.algorithm;
+    auto B = randomSlice!double(uniformVar(-100, 100), 5, 100);
+    
+    auto LU = A.luDecomp();
+    auto X = LU.solve(B);
+
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto B =
+        [ 2,  8,  3,  5,  8,
+          8,  1,  4,  9,  86,
+          1,  6,  7,  1,  67,
+          6,  1,  5,  4,  45,
+          1,  2,  3,  1,  11 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .universal;
+    auto C = B.slice;
+
+    auto LU = A.luDecomp();
+    auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B.transposed);
+    auto m2 = LU.solve(C);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), C.transposed));
+    assert(all!approxEqual(mtimes(A, m2), C));
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!float.slice
+            .canonical;
+    auto B = [ 1,  2,  3,  4,  5 ].sliced(5).as!double.slice;
+    auto C = B.slice.sliced(5, 1);
+
+    auto LU = A.luDecomp();
+    auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), C));
+}
+
+unittest
+{
+    auto A =
+        [ 1,  4, -3,  5,  6,
+         -2,  8,  5,  7,  8,
+          3,  4,  7,  9,  1,
+          2,  4,  6,  3,  2,
+          6,  8,  3,  5,  2 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .canonical;
+    auto B = [ 1,  15,  4,  5,  8,
+               3,  20,  1,  9,  11 ].sliced(5, 2).as!float.slice;
+
+    auto LU = A.luDecomp();
+    auto m = luSolve(LU.lut, LU.ipiv, B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), B));
+}
+
+unittest
+{
+    auto A =
+        [ 11,  14, -31,  53,  62,
+         -92,  83,  52,  74,  83,
+          31,  45,  73,  96,  17,
+          23,  14,  65,  35,  26,
+          62,  28,  34,  51,  25 ]
+            .sliced(5, 5)
+            .as!float.slice
+            .universal;
+    auto B =
+        [ 6,  1,  3,  1,  11,
+         12,  5,  7,  6,  78,
+          8,  4,  1,  5,  54,
+          3,  1,  8,  1,  45,
+          1,  6,  8,  6,  312 ]
+            .sliced(5, 5)
+            .as!double.slice;
+    auto B2 = B.slice;
+    auto C = B.slice;
+
+    auto LU = luDecomp(A.transposed);
+    auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B, 'T');
+    auto m2 = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B2);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), C));
+    assert(all!approxEqual(mtimes(A.transposed, m2), C));
+}
+
+unittest
+{
+    auto A =
+        [ 54,  93,  14,  44,  33,
+          51,  85,  28,  81,  75,
+          89,  17,  15,  44,  58,
+          75,  80,  18,  35,  14,
+          21,  48,  72,  21,  88 ]
+            .sliced(5, 5)
+            .as!double.slice
+            .universal;
+    auto B =
+        [ 5,  7,  8,  3,  78,
+          1,  2,  5,  4,  5,
+          2,  4,  1,  5,  15,
+          1,  1,  4,  1,  154,
+          1,  3,  1,  8,  17 ]
+            .sliced(5, 5)
+            .as!float.slice
+            .canonical;
+
+    auto LU = A.luDecomp();
+    auto m = luSolve(LU.lut, LU.ipiv, B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, m), B));
+}
+
+unittest
+{
+    
+    auto B =
+        [ 1,  4, -3,
+         -2,  8,  5,
+          3,  4,  7,
+          2,  4,  6 ]
+            .sliced(4, 3)
+            .as!double.slice;
+
+    auto LU = B.luDecomp!(Yes.allowDestroy)();
+    LU.l; LU.u;
+    auto res = mtimes(LU.l, LU.u);
+    moveRows(res, LU.ipiv);
+
+    assert(res == B);
+}
+
+unittest
+{
+    auto B =
+        [ 3, -7, -2,  2,
+         -3,  5,  1,  0,
+          6, -4,  0, -5,
+         -9,  5, -5, 12 ]
+            .sliced(4, 4)
+            .as!double.slice
+            .canonical;
+    auto C = B.transposed.slice;
+
+    auto LU = B.transposed.luDecomp!(Yes.allowDestroy)();
+    auto res = mtimes(LU.l, LU.u);
+    moveRows(res, LU.ipiv);
+
+    assert(res == C);
+}
+
+///Consist LDL factorization;
+struct LDLResult(T)
+{
+    /++
+    Matrix in witch lower triangular matrix is 'L' part of
+    factorization, diagonal is 'D' part.
+    +/
+    Slice!(Canonical, [2], T*) matrix;
+    /++
+    The pivot indices.
+    If ipiv(k) > 0, then rows and columns k and ipiv(k) were
+    interchanged and D(k, k) is a '1 x 1' diagonal block.
+    If ipiv(k) = ipiv(k + 1) < 0, then rows and columns k+1 and
+    -ipiv(k) were interchanged and D(k:k+1, k:k+1) is a '2 x 2'
+    diagonal block.
+    +/
+    Slice!(Contiguous, [1], lapackint*) ipiv;
+    /++
+    uplo = 'U': Upper triangle is stored;
+         = 'L': lower triangle is stored.
+    +/
+    char uplo;
+    /++
+    Return solves a system of linear equations
+        \A * X = B,
+    using LDL factorization.
+    +/
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kindB, size_t[] n, IteratorB)
+              (Slice!(kindB, n, IteratorB) b)
+    {
+        return ldlSolve!(allowDestroy)(matrix, ipiv, b, uplo);
+    }
+}
+
+/++
+Computes the factorization of a real symmetric matrix A using the
+Bunch-Kaufman diagonal pivoting method.
+The for of the factorization is:
+    \A = L*D*L**T
+Where L is product if permutation and unit lower triangular matrices,
+and D is symmetric and block diagonal with '1 x 1' and '2 x 2'
+diagonal blocks.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = input symmetric 'n x n' matrix for factorization.
+    uplo = 'U': Upper triangle is stored;
+         = 'L': lower triangle is stored.
+Returns:$(LREF LDLResult)
++/
+auto ldlDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, Iterator)
+              (Slice!(kind, [2], Iterator) a,
+               char uplo = 'L')
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+}
+body
+{
+    alias T = BlasType!Iterator;
+    auto work = [T.sizeof * a.length].uninitSlice!T;
+    auto ipiv = a.length.uninitSlice!lapackint;
+    auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.transposed.as!T.slice.canonical;
+
+    sytrf!T(m, ipiv, work, uplo);
+    return LDLResult!T(m, ipiv, uplo);
+}
+
+/++
+Solves a system of linear equations \A * X = B with symmetric matrix 'A' using the
+factorization
+\A = U * D * U**T, or
+\A = L * D * L**T
+computed by ldlDecomp.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = 'LD' or 'UD' matrix computed by ldlDecomp.
+    ipiv = details of the interchanges and the block structure of D as determined by ldlDecomp.
+    b = the right hand side matrix.
+    uplo = specifies whether the details of the factorization are stored as an upper or
+           lower triangular matrix:
+         = 'U': Upper triangular, form is \A = U * D * U**T;
+         = 'L': Lower triangular, form is \A = L * D * L**T.
+Returns:
+    The solution matrix.
++/
+auto ldlSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+              SliceKind kindB, size_t[] n, IteratorB, IteratorA)
+             (Slice!(Canonical, [2], IteratorA) a,
+              Slice!(Contiguous, [1], lapackint*) ipiv,
+              Slice!(kindB, n, IteratorB) b,
+              char uplo = 'L'
+             )
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+    assert(ipiv.length == a.length, "size of ipiv must be equal to the number of rows a");
+    assert(a.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
+}
+body
+{
+    alias A = BlasType!IteratorA;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(A, B);
+    static if(is(T* == IteratorA))
+        auto a_ = a;
+    else
+        auto a_ = a.as!T.slice.canonical;
+    
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    auto work = [T.sizeof * a.length].uninitSlice!T;
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
+    sytrs2!T(a_, m, ipiv, work, uplo);
+    return m.transposed;
+}
+
+///
+unittest
+{
+    auto A =
+        [ 2.07,  3.87,  4.20, -1.15,
+          3.87, -0.21,  1.87,  0.63,
+          4.20,  1.87,  1.15,  2.06,
+         -1.15,  0.63,  2.06, -1.81 ]
+            .sliced(4, 4)
+            .as!double.slice
+            .canonical;
+
+    import mir.random.variable;
+    import mir.random.algorithm;
+    auto B = randomSlice!double(uniformVar(-100, 100), 4, 100);
+
+    auto LDL = A.ldlDecomp('L');
+    auto X = LDL.solve(B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
+}
+
+unittest
+{
+    auto A =
+        [ 9, -1,  2,
+         -1,  8, -5,
+          2, -5,  7 ]
+            .sliced(3, 3)
+            .as!float.slice
+            .canonical;
+    auto A_ = A.slice;
+
+    auto B =
+        [ 5,  7,  1,
+          1,  8,  5,
+          9,  3,  2 ]
+          .sliced(3, 3)
+          .as!double.slice
+          .canonical;
+    auto B_ = B.slice;
+
+    auto LDL = A.ldlDecomp!(Yes.allowDestroy)('L');
+    auto X = ldlSolve!(Yes.allowDestroy)(A, LDL.ipiv, B.transposed, LDL.uplo);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A_, X), B_.transposed));
+}
+
+unittest
+{
+    auto A =
+        [10, 20, 30,
+         20, 45, 80,
+         30, 80, 171 ]
+            .sliced(3, 3)
+            .as!double.slice
+            .canonical;
+    auto B = [ 1, 4, 7 ].sliced(3).as!float.slice.canonical;
+    auto B_ = B.sliced(3, 1);
+
+    auto LDL = A.ldlDecomp('L');
+    auto X = LDL.solve(B);
+    
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B_));
+}
+
+struct choleskyResult(T)
+{
+    /++
+    If uplo = 'L': lower triangle of 'matrix' is stored.
+    If uplo = 'U': upper triangle of 'matrix' is stored.
+    +/
+    char uplo;
+    /++
+    if uplo = Lower, the leading 'N x N' lower triangular part of A
+    contains the lower triangular part of the matrix A, and the
+    strictly upper triangular part if A is not referenced.
+    if uplo = Upper, the leading 'N x N' upper triangular part of A
+    contains the upper triangular part of the matrix A, and the
+    strictly lower triangular part if A is not referenced.
+    +/
+    Slice!(Canonical, [2], T*) matrix;
+    /++
+    Return solves a system of linear equations
+        \A * X = B,
+    using Cholesky factorization.
+    +/
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, size_t[] n, Iterator)
+              (Slice!(kind, n, Iterator) b)
+    {
+        return choleskySolve!(allowDestroy)(matrix, b, uplo);
+    }
+}
+/++
+Computs Cholesky decomposition of symmetric positive definite matrix 'A'.
+The factorization has the form:
+    \A = U**T * U, if UPLO = Upper, or
+    \A = L * L**T, if UPLO = Lower
+Where U is an upper triangular matrix and L is lower triangular.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = symmetric 'N x N' matrix.
+    uplo = if uplo is Upper, then upper triangle of A is stored, else
+    lower.
+Returns: $(LREF choleskyResult)
++/
+auto choleskyDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+              SliceKind kind, Iterator)
+             (Slice!(kind, [2], Iterator) a,
+              char uplo)
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+}
+body
+{
+    alias T = BlasType!Iterator;
+    auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
+    potrf!T(m, uplo);
+    return choleskyResult!T(uplo, m);
+}
+
+/++
+    Solves a system of linear equations A * X = B with a symmetric matrix A using the
+    Cholesky factorization:
+    \A = U**T * U or
+    \A = L * L**T
+    computed by choleskyDecomp.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    c = the triangular factor 'U' or 'L' from the Cholesky factorization
+        \A = U**T * U or
+        \A = L * L**T,
+    as computed by choleskyDecomp.
+    b = the right hand side matrix.
+    uplo = 'U': Upper triangle of A is stored;
+         = 'L': Lower triangle of A is stored.
+Returns:
+    The solution matrix X.
++/
+auto choleskySolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+                   SliceKind kindB, size_t[] n, IteratorB, IteratorC)
+                  (Slice!(Canonical, [2], IteratorC) c,
+                   Slice!(kindB, n, IteratorB) b,
+                   char uplo)
+in
+{
+    assert(c.length!0 == c.length!1, "matrix must be squared");
+    assert(c.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
+}
+body
+{
+    alias B = BlasType!IteratorB;
+    alias C = BlasType!IteratorC;
+    alias T = CommonType!(B, C);
+    static if(is(T* == IteratorC))
+        auto c_ = c;
+    else
+        auto c_ = c.as!T.slice.canonical;
+
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
+    potrs!T(c_, m, uplo);
+    return m.transposed;
+}
+
+///
+unittest
+{
+    auto A =
+           [ 25, 15, -5,
+             15, 18,  0,
+             -5,  0, 11 ]
+             .sliced(3, 3)
+             .as!double.slice;
+    
+    import mir.random.variable;
+    import mir.random.algorithm;
+    auto B = randomSlice!double(uniformVar(-100, 100), 3, 100);
+
+    auto C = A.choleskyDecomp('L');
+    auto X = C.solve(B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  3,
+              1,  5,  5,
+              3,  5, 19 ]
+             .sliced(3, 3)
+             .as!double.slice
+             .universal;
+    auto B = [ 10,  157,  80 ].sliced(3).as!float.slice;
+    auto C_ = B.slice.sliced(3, 1);
+
+    auto C = A.choleskyDecomp('U');
+    auto X = choleskySolve!(Yes.allowDestroy)(C.matrix, B, C.uplo);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), C_));
+}
+
+unittest
+{
+    auto A =
+            [ 6,  15,  55,
+             15,  55, 225,
+             55, 225, 979 ]
+             .sliced(3, 3)
+             .as!float.slice
+             .canonical;
+    auto B =
+            [ 7,  3,
+              2,  1,
+              1,  8 ]
+              .sliced(3, 2)
+              .as!double.slice
+              .universal;
+
+    auto C = A.choleskyDecomp('L');
+    auto X = choleskySolve(C.matrix, B, C.uplo);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
+}
+
+
+///
+struct QRResult(T)
+{
+    /++
+    Matrix in witch the elements on and above the diagonal of the array contain the min(M, N) x N
+    upper trapezoidal matrix 'R' (R is upper triangular if m >= n). The elements below the
+    diagonal, with the array tau, represent the orthogonal matrix 'Q' as product of min(m, n).
+    +/
+    Slice!(Canonical, [2], T*) matrix;
+    ///The scalar factors of the elementary reflectors
+    Slice!(Contiguous, [1], T*) tau;
+    /++
+    Solve the least squares problem:
+        \min ||A * X - B||
+    Using the QR factorization:
+        \A = Q * R
+    computed by qrDecomp.
+    +/
+    auto solve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+               SliceKind kind, size_t[] n, Iterator)
+              (Slice!(kind, n, Iterator) b)
+    {
+        return qrSolve!(allowDestroy)(matrix, tau, b);
+    }
+}
+
+/++
+Computes a QR factorization of matrix 'a'.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = initial matrix
+Returns: $(LREF QRResult)
++/
+auto qrDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+              SliceKind kind, Iterator)
+             (Slice!(kind, [2], Iterator) a)
+{
+    alias T = BlasType!Iterator;
+    auto work = [T.sizeof * a.length].uninitSlice!T;
+    auto tau = (cast(int) min(a.length!0, a.length!1)).uninitSlice!T;
+    auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.transposed.as!T.slice.canonical;
+
+    geqrf!T(m, tau, work);
+    return QRResult!T(m, tau);
+}
+
+/++
+Solve the least squares problem:
+    \min ||A * X - B||
+Using the QR factorization:
+    \A = Q * R
+computed by qrDecomp.
+Params:
+    allowDestroy = flag to delete the source matrix.
+    a = detalis of the QR factorization of the original matrix as returned by qrDecomp.
+    tau = details of the orhtogonal matrix Q.
+    b = right hand side matrix.
+Returns: solution matrix.
++/
+auto qrSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
+             SliceKind kindB, size_t[] n, IteratorB, IteratorA, IteratorT)
+            (Slice!(Canonical, [2], IteratorA) a,
+             Slice!(Contiguous, [1], IteratorT) tau,
+             Slice!(kindB, n, IteratorB) b
+            )
+in
+{
+    assert(a.length!0 == a.length!1, "matrix must be squared");
+    assert(a.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
+}
+body
+{
+    alias A = BlasType!IteratorA;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(A, B);
+    static if(is(T* == IteratorA))
+        auto a_ = a;
+    else
+        auto a_ = a.as!T.slice.canonical;
+    static if(is(T* == IteratorT))
+        auto tau_ = tau;
+    else
+        auto tau_ = tau.as!T.slice.canonical;
+
+    //convect vector to matrix.
+    static if(n[0] == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
+    auto work = [m.length!0].uninitSlice!T;
+    static if(is(T == double) || is(T == float))
+        ormqr!T(a_, tau_, m, work, 'L', 'T');
+    else
+        unmqr!T(a_, tau_, m, work, 'L', 'C');
+    trsm!T(Side.Right, Uplo.Lower, Diag.NonUnit, cast(T) 1.0, a_, m);
+
+    return m.transposed;
+}
+
+///
+unittest
+{
+    auto A =
+            [ 3,  1, -1,  2,
+             -5,  1,  3, -4,
+              2,  0,  1, -1,
+              1, -5,  3, -3 ]
+              .sliced(4, 4)
+              .as!double.slice;
+
+    import mir.random.variable;
+    import mir.random.algorithm;
+    auto B = randomSlice!double(uniformVar(-100, 100), 4, 100);
+
+    auto C = qrDecomp(A);
+    auto X = C.solve(B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B));
+}
+
+
+unittest
+{
+    auto A =
+            [ 3,  1, -1,  2,
+             -5,  1,  3, -4,
+              2,  0,  1, -1,
+              1, -5,  3, -3 ]
+              .sliced(4, 4)
+              .as!float.slice;
+    auto B = [ 6, -12, 1, 3 ].sliced(4).as!double.slice.canonical;
+    auto B_ = B.slice.sliced(B.length, 1);
+    auto C = qrDecomp(A);
+    auto X = qrSolve(C.matrix, C.tau, B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    assert(all!approxEqual(mtimes(A, X), B_));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  0,
+              1,  0,  1,
+              0,  1,  1 ]
+              .sliced(3, 3)
+              .as!double.slice;
+
+    auto B =
+            [ 7,  6,  98,
+              4,  8,  17,
+              5,  3,  24 ]
+              .sliced(3, 3)
+              .as!float.slice;
+    auto C = qrDecomp(A);
+    auto X = qrSolve(C.matrix, C.tau, B);
+
+    import std.math: approxEqual;
+    import mir.ndslice.algorithm: all;
+    
+    assert(all!approxEqual(mtimes(A, X), B));
+}
+
+unittest
+{
+    auto A =
+            [ 1,  1,  0,
+              1,  0,  1,
+              0,  1,  1 ]
+              .sliced(3, 3)
+              .as!cdouble.slice;
+
+    auto B =
+            [ 15,  78,  11,
+              21,  47,  71,
+              81,  11,  81 ]
+              .sliced(3, 3)
+              .as!cfloat.slice;
+    auto C = qrDecomp(A);
+    auto X = qrSolve(C.matrix, C.tau, B);
+    auto res = mtimes(A, X);
+
+    import std.math: abs;
+    import mir.ndslice.algorithm: equal;
+    assert(equal!((a, b) => abs(a - b) < 1e-12)(res, B));
+}
+

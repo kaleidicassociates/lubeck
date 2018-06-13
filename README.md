@@ -20,6 +20,12 @@ if A is not a square matrix.
  - `det`/`detSymmetric` - General/symmetric matrix determinant.
  - `eigSymmetric` - Eigenvalues and eigenvectors of symmetric matrix.
 
+v0.0.6-beta:
+ - Qr decomposition: `qrDecomp` with `solve` method
+ - Cholesky: `choleskyDecomp` with `solve` method
+ - LU decomposition: `luDecomp` with `solve` method
+ - LDL decomposition: `ldlDecomp` with `solve` method
+
 ## Example
 
 ```d
