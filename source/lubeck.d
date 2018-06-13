@@ -2076,8 +2076,7 @@ unittest
     auto X = qrSolve(C.matrix, C.tau, B);
     auto res = mtimes(A, X);
 
-    import std.math: abs;
+    import std.complex: abs;
     import mir.ndslice.algorithm: equal;
     assert(equal!((a, b) => abs(a - b) < 1e-12)(res, B));
 }
-
