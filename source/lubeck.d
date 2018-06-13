@@ -5,19 +5,18 @@ Authors: Ilya Yaroshenko, Lars Tandle Kyllingstad (SciD author)
 +/
 module lubeck;
 
-import mir.ndslice.slice;
-import mir.ndslice.dynamic: transposed;
-import mir.ndslice.topology;
-import mir.ndslice.allocation;
-import mir.utility;
-import mir.math.common;
-import std.traits;
-import std.meta;
-import std.typecons: Flag, Yes, No;
 import cblas : Diag;
-
 import mir.blas;
 import mir.lapack;
+import mir.math.common;
+import mir.ndslice.allocation;
+import mir.ndslice.dynamic: transposed;
+import mir.ndslice.slice;
+import mir.ndslice.topology;
+import mir.utility;
+import std.meta;
+import std.traits;
+import std.typecons: Flag, Yes, No;
 
 version(LDC)
     import ldc.attributes: fastmath;
@@ -310,10 +309,10 @@ unittest
         _13, -_16, _13]
         .sliced(a.shape);
 
-    import mir.ndslice.algorithm: all;
+    import mir.ndslice.algorithm: equal;
     import std.math: approxEqual;
-    assert(all!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.inv, ans));
-    assert(all!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.as!cdouble.inv.as!double, ans));
+    assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.inv, ans));
+    assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.as!cdouble.inv.as!double, ans));
 }
 
 ///
@@ -417,9 +416,9 @@ unittest
     sigma.diagonal[] = r.sigma;
     auto m = r.u.mtimes(sigma).mtimes(r.vt);
 
-    import mir.ndslice.algorithm: all;
+    import mir.ndslice.algorithm: equal;
     import std.math: approxEqual;
-    assert(all!((a, b) => a.approxEqual(b, 1e-8, 1e-8))(a, m));
+    assert(equal!((a, b) => a.approxEqual(b, 1e-8, 1e-8))(a, m));
 }
 
 ///
@@ -637,7 +636,7 @@ body
 unittest
 {
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
+    import mir.ndslice.algorithm: equal;
 
     auto ingedients = [
          7,  26,   6,  60,
@@ -682,9 +681,9 @@ unittest
     auto latent = [5.177968780739053, 0.674964360487231, 0.124054300480810, 0.002371532651878].sliced;
     latent[] *= 100;
 
-    assert(all!approxEqual(res.coeff, coeff));
-    assert(all!approxEqual(res.score, score));
-    assert(all!approxEqual(res.latent, latent));
+    assert(equal!approxEqual(res.coeff, coeff));
+    assert(equal!approxEqual(res.score, score));
+    assert(equal!approxEqual(res.latent, latent));
 }
 
 /++
@@ -1309,8 +1308,8 @@ unittest
     auto m = luSolve(LU.lut, LU.ipiv, B_);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, m), B_));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, m), B_));
 }
 
 ///
@@ -1364,9 +1363,9 @@ unittest
     auto m2 = LU.solve(C);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, m), C.transposed));
-    assert(all!approxEqual(mtimes(A, m2), C));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, m), C.transposed));
+    assert(equal!approxEqual(mtimes(A, m2), C));
 }
 
 unittest
@@ -1387,8 +1386,8 @@ unittest
     auto m = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, m), C));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, m), C));
 }
 
 unittest
@@ -1409,8 +1408,8 @@ unittest
     auto m = luSolve(LU.lut, LU.ipiv, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, m), B));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, m), B));
 }
 
 unittest
@@ -1440,9 +1439,9 @@ unittest
     auto m2 = luSolve!(Yes.allowDestroy)(LU.lut, LU.ipiv, B2);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, m), C));
-    assert(all!approxEqual(mtimes(A.transposed, m2), C));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, m), C));
+    assert(equal!approxEqual(mtimes(A.transposed, m2), C));
 }
 
 unittest
@@ -1470,8 +1469,8 @@ unittest
     auto m = luSolve(LU.lut, LU.ipiv, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, m), B));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, m), B));
 }
 
 unittest
@@ -1493,6 +1492,7 @@ unittest
     assert(res == B);
 }
 
+///
 unittest
 {
     auto B =
@@ -1509,7 +1509,9 @@ unittest
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
-    assert(res == C);
+    import mir.ndslice.algorithm: equal;
+    import std.math: approxEqual;
+    assert(res.equal!approxEqual(C));
 }
 
 ///Consist LDL factorization;
@@ -1657,8 +1659,8 @@ unittest
     auto X = LDL.solve(B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, X), B));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, X), B));
 }
 
 unittest
@@ -1685,8 +1687,8 @@ unittest
     auto X = ldlSolve!(Yes.allowDestroy)(A, LDL.ipiv, B.transposed, LDL.uplo);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A_, X), B_.transposed));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A_, X), B_.transposed));
 }
 
 unittest
@@ -1705,8 +1707,8 @@ unittest
     auto X = LDL.solve(B);
     
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, X), B_));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, X), B_));
 }
 
 struct choleskyResult(T)
@@ -1836,8 +1838,8 @@ unittest
     auto X = C.solve(B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, X), B));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, X), B));
 }
 
 unittest
@@ -1856,8 +1858,8 @@ unittest
     auto X = choleskySolve!(Yes.allowDestroy)(C.matrix, B, C.uplo);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, X), C_));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, X), C_));
 }
 
 unittest
@@ -1881,8 +1883,8 @@ unittest
     auto X = choleskySolve(C.matrix, B, C.uplo);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, X), B));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, X), B));
 }
 
 
@@ -2009,8 +2011,8 @@ unittest
     auto X = C.solve(B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, X), B));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, X), B));
 }
 
 
@@ -2029,8 +2031,8 @@ unittest
     auto X = qrSolve(C.matrix, C.tau, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
-    assert(all!approxEqual(mtimes(A, X), B_));
+    import mir.ndslice.algorithm: equal;
+    assert(equal!approxEqual(mtimes(A, X), B_));
 }
 
 unittest
@@ -2052,9 +2054,9 @@ unittest
     auto X = qrSolve(C.matrix, C.tau, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: all;
+    import mir.ndslice.algorithm: equal;
     
-    assert(all!approxEqual(mtimes(A, X), B));
+    assert(equal!approxEqual(mtimes(A, X), B));
 }
 
 unittest
@@ -2076,7 +2078,6 @@ unittest
     auto X = qrSolve(C.matrix, C.tau, B);
     auto res = mtimes(A, X);
 
-    import std.complex: abs;
     import mir.ndslice.algorithm: equal;
-    assert(equal!((a, b) => abs(a - b) < 1e-12)(res, B));
+    assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, B));
 }

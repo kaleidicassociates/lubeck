@@ -6,11 +6,18 @@ license "BSL-1.0"
 dependency "mir-lapack" version="~>0.0.7-alpha"
 dependency "mir-blas" version="~>0.1.2-alpha3"
 dependency "mir-random" version="~>0.4.3"
+dependency "mir-algorithm" version=">=1.1.0"
 
 buildType "unittest" {
 	buildOptions "unittests" "debugMode" "debugInfo"
 	libs "lapack" "blas"
 }
+
+buildType "unittest-openblas" {
+	buildOptions "unittests" "debugMode" "debugInfo"
+	libs "openblas"
+}
+
 buildType "unittest-cov" {
 	buildOptions "unittests" "coverage" "debugMode" "debugInfo"
 	libs "lapack" "blas"
