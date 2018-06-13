@@ -541,7 +541,7 @@ Principal component analysis of raw data.
 
 Params:
     matrix = input `M x N` matrix, where 'M (rows)>= N(cols)'
-    centerColumns = Flag to centern columns. True by default.
+    cc = Flag to centern columns. True by default.
 Returns: $(LREF PcaResult)
 +/
 auto pca(Flag!"allowDestroy" allowDestroy = No.allowDestroy, SliceKind kind, Iterator)(Slice!(kind, [2], Iterator) matrix, in Flag!"centerColumns" cc = Yes.centerColumns)
