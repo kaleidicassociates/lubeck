@@ -946,8 +946,8 @@ unittest
         d[k,l] = 0.5 * (k == l ? (k + 1) * (k + 1) + 1 : 2 * (k + 1) * (l + 1));
 
     auto dd = det(d);
-    import std.math: ldexp, approxEqual;
-    assert (approxEqual(dd, ldexp(8.972817920259982e319L, -dn), double.epsilon.sqrt));
+    import std.math: approxEqual;
+    assert (approxEqual(dd, 3.539152633479803e289, double.epsilon.sqrt));
 
     // Symmetric packed matrix
     auto spa = [ 1.0, -2, 3, 4, 5, -6, -7, -8, -9, 10].sliced.stairs!"+"(4);
@@ -1489,7 +1489,9 @@ unittest
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
-    assert(res == B);
+    import mir.ndslice.algorithm: equal;
+    import std.math: approxEqual;
+    assert(res.equal!approxEqual(B));
 }
 
 ///
