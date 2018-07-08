@@ -8,10 +8,10 @@ d:
   - ldc
 
 script:
-  - dub test
-  - dub --root example
+  - dub test -c unittest-blas
+  - dub run -c blas --root example
 
 addons:
   apt:
     packages:
-      - libatlas-base-dev
+      - liblapack-dev

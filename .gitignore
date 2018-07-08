@@ -21,3 +21,5 @@ lubeck-test-library
 .vscode
 *.directory
 *.sublime-workspace
+lubeck-test-unittest
+.DS_Store

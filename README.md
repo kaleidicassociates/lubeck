@@ -1,13 +1,17 @@
-[![Build Status](https://www.travis-ci.org/kaleidicassociates/lubeck.svg?branch=master)](https://www.travis-ci.org/kaleidicassociates/lubeck)
 
-# lubeck
+[![Gitter](https://img.shields.io/gitter/room/libmir/public.svg)](https://gitter.im/libmir/public)
+[![Build Status](https://www.travis-ci.org/kaleidicassociates/lubeck.svg?branch=master)](https://www.travis-ci.org/kaleidicassociates/lubeck)
+[![Dub downloads](https://img.shields.io/dub/dt/lubeck.svg)](http://code.dlang.org/packages/lubeck)
+[![Dub downloads](https://img.shields.io/dub/dm/lubeck.svg)](http://code.dlang.org/packages/lubeck)
+[![License](https://img.shields.io/dub/l/lubeck.svg)](http://code.dlang.org/packages/lubeck)
+[![Latest version](https://img.shields.io/dub/v/lubeck.svg)](http://code.dlang.org/packages/lubeck)
+
+# Lubeck
 High level linear algebra library for Dlang
 
-## Required static libraries
- - `blas`/`cblas` - CBLAS API
- - `lapack` - FORTRAN 77 LAPACK API
+## Required system libraries
 
-See the `dub.sdl` in the example folder.
+See [wiki: Link with CBLAS & LAPACK](https://github.com/libmir/mir-lapack/wiki/Link-with-CBLAS-&-LAPACK).
 
 ## API
  - `mtimes` - General matrix-matrix, row-matrix, matrix-column, and row-column multiplications.
