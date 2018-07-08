@@ -3,22 +3,73 @@ description "High level linear algebra library for Dlang"
 authors "Ilya Yaroshenko" "Lars Tandle Kyllingstad (SciD author)"
 copyright "Copyright © 2017, Symmetry Investments & Kaleidic Associates; Copyright (c) 2009, Lars T. Kyllingstad (SciD)"
 license "BSL-1.0"
-dependency "mir-lapack" version="~>0.0.7-alpha"
-dependency "mir-blas" version="~>0.1.2-alpha3"
-dependency "mir-random" version="~>0.4.3"
+
+dependency "mir-lapack" version="~>0.1.0"
 dependency "mir-algorithm" version=">=1.1.0"
 
-buildType "unittest" {
-	buildOptions "unittests" "debugMode" "debugInfo"
-	libs "lapack" "blas"
+configuration "library" {
+	targetType "library"
+	# default or user specified mir-lapack sub-configuration is used
 }
 
-buildType "unittest-openblas" {
-	buildOptions "unittests" "debugMode" "debugInfo"
-	libs "openblas"
+configuration "unittest" {
+	dependency "mir-random" version="~>0.4.1"
 }
 
-buildType "unittest-cov" {
-	buildOptions "unittests" "coverage" "debugMode" "debugInfo"
-	libs "lapack" "blas"
+configuration "openblas" {
+	subConfiguration "mir-lapack" "openblas"
+}
+
+configuration "threelib" {
+	subConfiguration "mir-lapack" "threelib"
+}
+
+configuration "cblas" {
+	subConfiguration "mir-lapack" "cblas"
+}
+
+configuration "blas" {
+	subConfiguration "mir-lapack" "blas"
+}
+
+configuration "lapack" {
+	subConfiguration "mir-lapack" "lapack"
+}
+
+configuration "mkl-sequential" {
+	subConfiguration "mir-lapack" "mkl-sequential"
+}
+
+configuration "zerolib" {
+	subConfiguration "mir-lapack" "zerolib"
+}
+
+configuration "unittest-openblas" {
+	dependency "mir-random" version="~>0.4.1"
+	subConfiguration "mir-lapack" "openblas"
+}
+
+configuration "unittest-threelib" {
+	dependency "mir-random" version="~>0.4.1"
+	subConfiguration "mir-lapack" "threelib"
+}
+
+configuration "unittest-cblas" {
+	dependency "mir-random" version="~>0.4.1"
+	subConfiguration "mir-lapack" "cblas"
+}
+
+configuration "unittest-blas" {
+	dependency "mir-random" version="~>0.4.1"
+	subConfiguration "mir-lapack" "blas"
+}
+
+configuration "unittest-lapack" {
+	dependency "mir-random" version="~>0.4.1"
+	subConfiguration "mir-lapack" "lapack"
+}
+
+configuration "unittest-mkl-sequential" {
+	dependency "mir-random" version="~>0.4.1"
+	subConfiguration "mir-lapack" "mkl-sequential"
 }

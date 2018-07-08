@@ -4,3 +4,16 @@ dependency "lubeck" path="../"
 description "Lubeck example"
 license "BSL-1.0"
 libs "lapack" "blas"
+
+configuration "library" {
+	targetType "library"
+	# default or user specified mir-lapack sub-configuration is used
+}
+
+configuration "openblas" {
+	subConfiguration "mir-lapack" "openblas"
+}
+
+configuration "blas" {
+	subConfiguration "mir-lapack" "blas"
+}
