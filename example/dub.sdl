@@ -4,6 +4,7 @@ dependency "lubeck" path="../"
 description "Lubeck example"
 license "BSL-1.0"
 libs "lapack" "blas"
+targetType "executable"
 
 configuration "executable" {
 	targetType "executable"
