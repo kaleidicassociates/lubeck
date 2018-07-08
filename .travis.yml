@@ -8,7 +8,7 @@ d:
   - ldc
 
 script:
-  - dub test -c blas
+  - dub test -c unittest-blas
   - dub run -c blas --root example
 
 addons:
