@@ -5,8 +5,8 @@ description "Lubeck example"
 license "BSL-1.0"
 libs "lapack" "blas"
 
-configuration "library" {
-	targetType "library"
+configuration "executable" {
+	targetType "executable"
 	# default or user specified mir-lapack sub-configuration is used
 }
 
