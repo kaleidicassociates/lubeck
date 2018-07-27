@@ -34,7 +34,7 @@ v0.0.6-beta:
 
 ```d
 /+dub.sdl:
-dependency "lubeck" version="~>0.0.4"
+dependency "lubeck" version="~>0.1"
 libs "lapack" "blas"
 +/
 // or libs "openblas"
@@ -55,7 +55,7 @@ void main()
 }
 ```
 
-[![Open on run.dlang.io](https://img.shields.io/badge/run.dlang.io-open-blue.svg)](https://run.dlang.io/is/vzhvo5)
+[![Open on run.dlang.io](https://img.shields.io/badge/run.dlang.io-open-blue.svg)](https://run.dlang.io/is/RQRMoo)
 
 ### Related packages
  - [mir-algorithm](https://github.com/libmir/mir-algorithm)
