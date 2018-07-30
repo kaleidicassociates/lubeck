@@ -1105,7 +1105,7 @@ unittest
              0,  0,  0 ]
              .sliced(10, 3)
              .as!double.slice;
-    auto ipiv = [ 10, 9, 8, 7, 6, 6, 7, 8, 9, 10 ].sliced(10);
+    auto ipiv = [ lapackint(10), 9, 8, 7, 6, 6, 7, 8, 9, 10 ].sliced(10);
     moveRows(A, ipiv);
 
     auto B = 
@@ -1141,7 +1141,7 @@ unittest
              0,  0,  0 ]
              .sliced(10, 3)
              .as!double.slice;
-    auto ipiv = [ 2, 3, 4, 5, 6, 7, 8, 9, 10, 10 ].sliced(10);
+    auto ipiv = [ lapackint(2), 3, 4, 5, 6, 7, 8, 9, 10, 10 ].sliced(10);
     moveRows(A, ipiv);
     
     auto B = 

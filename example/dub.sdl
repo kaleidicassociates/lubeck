@@ -1,10 +1,8 @@
 name "example"
 authors "Ilya Yaroshenko"
 dependency "lubeck" path="../"
-dependency "mir-lapack" version="~>0.1.0"
 description "Lubeck example"
 license "BSL-1.0"
-libs "lapack" "blas"
 targetType "executable"
 
 configuration "executable" {

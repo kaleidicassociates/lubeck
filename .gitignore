@@ -23,3 +23,6 @@ lubeck-test-library
 *.sublime-workspace
 lubeck-test-unittest
 .DS_Store
+*.lib
+*.dll
+*.exe
