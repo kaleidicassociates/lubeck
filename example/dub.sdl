@@ -11,9 +11,11 @@ configuration "executable" {
 }
 
 configuration "openblas" {
-	subConfiguration "mir-lapack" "openblas"
+	targetType "executable"
+	subConfiguration "lubeck" "openblas"
 }
 
 configuration "blas" {
-	subConfiguration "mir-lapack" "blas"
+	targetType "executable"
+	subConfiguration "lubeck" "blas"
 }
