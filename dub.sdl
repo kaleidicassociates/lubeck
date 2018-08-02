@@ -13,7 +13,7 @@ configuration "library" {
 }
 
 configuration "unittest" {
-	dependency "mir-random" version="~>0.4.1"
+	dependency "mir-random" version="~>1.0.0-beta"
 }
 
 configuration "openblas" {
@@ -73,31 +73,31 @@ configuration "zerolib" {
 }
 
 configuration "unittest-openblas" {
-	dependency "mir-random" version="~>0.4.1"
+	dependency "mir-random" version="~>1.0.0-beta"
 	subConfiguration "mir-lapack" "openblas"
 }
 
 configuration "unittest-threelib" {
-	dependency "mir-random" version="~>0.4.1"
+	dependency "mir-random" version="~>1.0.0-beta"
 	subConfiguration "mir-lapack" "threelib"
 }
 
 configuration "unittest-cblas" {
-	dependency "mir-random" version="~>0.4.1"
+	dependency "mir-random" version="~>1.0.0-beta"
 	subConfiguration "mir-lapack" "cblas"
 }
 
 configuration "unittest-blas" {
-	dependency "mir-random" version="~>0.4.1"
+	dependency "mir-random" version="~>1.0.0-beta"
 	subConfiguration "mir-lapack" "blas"
 }
 
 configuration "unittest-lapack" {
-	dependency "mir-random" version="~>0.4.1"
+	dependency "mir-random" version="~>1.0.0-beta"
 	subConfiguration "mir-lapack" "lapack"
 }
 
 configuration "unittest-mkl-sequential" {
-	dependency "mir-random" version="~>0.4.1"
+	dependency "mir-random" version="~>1.0.0-beta"
 	subConfiguration "mir-lapack" "mkl-sequential"
 }
