@@ -6,13 +6,8 @@ cblas_d_dep = dependency('cblas-d', fallback : ['cblas', 'cblas_dep'])
 mir_blas_dep = dependency('mir-blas', fallback : ['mir-blas', 'mir_blas_dep'])
 mir_lapack_dep = dependency('mir-lapack', fallback : ['mir-lapack', 'mir_lapack_dep'])
 lapack_dep = dependency('lapack', fallback : ['lapack', 'lapack_dep'])
-cc = meson.get_compiler('c')
-lapack_deps = []
-if not cc.find_library('openblas', required : false).found()
-    lapack_deps = [cc.find_library('lapack')]
-endif
 
-required_deps = [cblas_d_dep, lapack_deps, lapack_dep, mir_algorithm_dep, mir_random_dep, mir_blas_dep, mir_lapack_dep]
+required_deps = [cblas_d_dep, lapack_dep, mir_algorithm_dep, mir_random_dep, mir_blas_dep, mir_lapack_dep]
 
 if target_machine.system() == 'linux'
     mir_linux_kernel_dep = dependency('mir-linux-kernel', fallback : ['mir-linux-kernel', 'mir_linux_kernel_dep'])
