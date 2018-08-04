@@ -1,7 +1,7 @@
 project('lubeck', 'd', 'c', version : '1.0.0', license: 'BSL-1.0')
 
 cblas_d_dep = dependency('cblas-d', fallback : ['cblas', 'cblas_dep'])
-lapack_dep = dependency('lapack', fallback : ['lapack', 'lapack_dep'])
+lapack_d_dep = dependency('lapack-d', fallback : ['lapack', 'lapack_dep'])
 mir_algorithm_dep = dependency('mir-algorithm', fallback : ['mir-algorithm', 'mir_algorithm_dep'])
 mir_blas_dep = dependency('mir-blas', fallback : ['mir-blas', 'mir_blas_dep'])
 mir_lapack_dep = dependency('mir-lapack', fallback : ['mir-lapack', 'mir_lapack_dep'])
@@ -9,7 +9,7 @@ mir_random_dep = dependency('mir-random', fallback : ['mir-random', 'mir_random_
 
 required_deps = [
     cblas_d_dep,
-    lapack_dep,
+    lapack_d_dep,
     mir_algorithm_dep,
     mir_blas_dep,
     mir_lapack_dep,
