@@ -1,13 +1,20 @@
 project('lubeck', 'd', 'c', version : '1.0.0', license: 'BSL-1.0')
 
-mir_algorithm_dep = dependency('mir-algorithm', fallback : ['mir-algorithm', 'mir_algorithm_dep'])
-mir_random_dep = dependency('mir-random', fallback : ['mir-random', 'mir_random_dep'])
 cblas_d_dep = dependency('cblas-d', fallback : ['cblas', 'cblas_dep'])
+lapack_dep = dependency('lapack', fallback : ['lapack', 'lapack_dep'])
+mir_algorithm_dep = dependency('mir-algorithm', fallback : ['mir-algorithm', 'mir_algorithm_dep'])
 mir_blas_dep = dependency('mir-blas', fallback : ['mir-blas', 'mir_blas_dep'])
 mir_lapack_dep = dependency('mir-lapack', fallback : ['mir-lapack', 'mir_lapack_dep'])
-lapack_dep = dependency('lapack', fallback : ['lapack', 'lapack_dep'])
+mir_random_dep = dependency('mir-random', fallback : ['mir-random', 'mir_random_dep'])
 
-required_deps = [cblas_d_dep, lapack_dep, mir_algorithm_dep, mir_random_dep, mir_blas_dep, mir_lapack_dep]
+required_deps = [
+    cblas_d_dep,
+    lapack_dep,
+    mir_algorithm_dep,
+    mir_blas_dep,
+    mir_lapack_dep,
+    mir_random_dep,
+    ]
 
 if target_machine.system() == 'linux'
     mir_linux_kernel_dep = dependency('mir-linux-kernel', fallback : ['mir-linux-kernel', 'mir_linux_kernel_dep'])
