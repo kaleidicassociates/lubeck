@@ -10,7 +10,7 @@ d:
 script:
   - dub test -c unittest-blas
   - dub run -c blas --root example
-  - meson build && cd build && ninja -j4 && ninja test -v && cd ..
+  - meson build --unity=on --default-library=static && cd build && ninja -j4 && ninja test -v && cd ..
 
 addons:
   apt:
