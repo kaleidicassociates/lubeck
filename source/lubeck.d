@@ -254,7 +254,7 @@ CommonType!(BlasType!IteratorA, BlasType!IteratorB)
     else
     {
         auto c = cast(typeof(return)) 0;
-        import mir.ndslice.algorithm: reduce;
+        import mir.algorithm.iteration: reduce;
         return c.reduce!"a + b * c"(a.as!(typeof(return)), b.as!(typeof(return)));
     }
 }
@@ -309,7 +309,7 @@ unittest
         _13, -_16, _13]
         .sliced(a.shape);
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     import std.math: approxEqual;
     assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.inv, ans));
     assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.as!cdouble.inv.as!double, ans));
@@ -416,7 +416,7 @@ unittest
     sigma.diagonal[] = r.sigma;
     auto m = r.u.mtimes(sigma).mtimes(r.vt);
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     import std.math: approxEqual;
     assert(equal!((a, b) => a.approxEqual(b, 1e-8, 1e-8))(a, m));
 }
@@ -592,7 +592,7 @@ in
 body
 {
     import mir.math.sum: sum;
-    import mir.ndslice.algorithm: maxIndex, eachUploPair;
+    import mir.algorithm.iteration: maxIndex, eachUploPair;
     import mir.utility: swap;
 
     alias T = BlasType!Iterator;
@@ -636,7 +636,7 @@ body
 unittest
 {
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
 
     auto ingedients = [
          7,  26,   6,  60,
@@ -697,7 +697,7 @@ Returns: Moore-Penrose pseudoinverse matrix
 Slice!(BlasType!Iterator*, 2)
     pinv(Flag!"allowDestroy" allowDestroy = No.allowDestroy, Iterator, SliceKind kind)(Slice!(Iterator, 2, kind) matrix, BlasType!Iterator tolerance = BlasType!Iterator.nan)
 {
-    import mir.ndslice.algorithm: find, each;
+    import mir.algorithm.iteration: find, each;
     import std.math: nextUp;
 
     auto svd = matrix.svd!allowDestroy(Yes.slim);
@@ -707,7 +707,12 @@ Slice!(BlasType!Iterator*, 2)
         auto eps = n.nextUp - n;
         tolerance = max(matrix.length!0, matrix.length!1) * eps;
     }
-    auto s = svd.sigma[0 .. $ - svd.sigma.find!(a => !(a >= tolerance))[0]];
+    auto st = svd.sigma.find!(a => !(a >= tolerance));
+    static if (is(typeof(st) : sizediff_t))
+        alias si = st;
+    else
+        auto si = st[0];
+    auto s = svd.sigma[0 .. $ - si];
     s.each!"a = 1 / a";
     svd.vt[0 .. s.length].pack!1.map!"a".zip(s).each!"a.a[] *= a.b";
     auto v = svd.vt[0 .. s.length].universal.transposed;
@@ -755,7 +760,7 @@ Slice!(BlasType!Iterator*, 2)
     cov(Iterator, SliceKind kind)(Slice!(Iterator, 2, kind) matrix)
 {
     import mir.math.sum: sum;
-    import mir.ndslice.algorithm: each, eachUploPair;
+    import mir.algorithm.iteration: each, eachUploPair;
     alias A = BlasType!Iterator;
     static if (kind == Contiguous)
         auto mc = matrix.canonical;
@@ -814,7 +819,7 @@ in
 }
 body
 {
-    import mir.ndslice.algorithm: each;
+    import mir.algorithm.iteration: each;
     import mir.ndslice.topology: diagonal;
     import mir.math.numeric: Prod;
 
@@ -948,7 +953,7 @@ unittest
     // Symmetric packed matrix
     auto spa = [ 1.0, -2, 3, 4, 5, -6, -7, -8, -9, 10].sliced.stairs!"+"(4);
     auto sp = [spa.length, spa.length].uninitSlice!double;
-    import mir.ndslice.algorithm: each;
+    import mir.algorithm.iteration: each;
     sp.stairs!"+".each!"a[] = b"(spa);
     assert (detSymmetric('L', sp).approxEqual(5874.0, double.epsilon.sqrt));
     assert (detSymmetric('U', sp.universal.transposed).approxEqual(5874.0, double.epsilon.sqrt));
@@ -982,7 +987,7 @@ in
 }
 body
 {
-    import mir.ndslice.algorithm: each;
+    import mir.algorithm.iteration: each;
     import mir.ndslice.topology: diagonal;
     import mir.math.numeric: Prod;
 
@@ -1075,7 +1080,7 @@ Returns:
                         (Slice!(Iterator, 2, kind) a,
                         Slice!(lapackint*) ipiv)
     {
-        import mir.ndslice.algorithm: each;
+        import mir.algorithm.iteration: each;
         foreach_reverse(i;0..ipiv.length)
         {
             if(ipiv[i] == i + 1)
@@ -1118,7 +1123,7 @@ unittest
              .sliced(10, 3)
              .as!double.slice;
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(B, A));
 }
 
@@ -1154,7 +1159,7 @@ unittest
              .sliced(10, 3)
              .as!double.slice;
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(B, A));
 }
 
@@ -1175,7 +1180,7 @@ struct LUResult(T)
     ///L part of the factorization.
     auto l() @property
     {
-        import mir.ndslice.algorithm: eachUpper;
+        import mir.algorithm.iteration: eachUpper;
         auto l = lut.transposed[0..lut.length!1, 0..min(lut.length!0, lut.length!1)].slice.canonical;
         l.eachUpper!"a = 0";
         l.diagonal[] = 1;
@@ -1184,7 +1189,7 @@ struct LUResult(T)
     ///U part of the factorization.
     auto u() @property
     {
-        import mir.ndslice.algorithm: eachLower;
+        import mir.algorithm.iteration: eachLower;
         auto u = lut.transposed[0..min(lut.length!0, lut.length!1), 0..lut.length!0].slice.canonical;
         u.eachLower!"a = 0";
         return u;
@@ -1304,7 +1309,7 @@ unittest
     auto m = luSolve('N', LU.lut, LU.ipiv, B_);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, m), B_));
 }
 
@@ -1328,7 +1333,7 @@ unittest
     auto LU = A.luDecomp();
     auto X = LU.solve('N', B);
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(mtimes(A, X), B));
 }
 
@@ -1359,7 +1364,7 @@ unittest
     auto m2 = LU.solve('N', C);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, m), C.transposed));
     assert(equal!approxEqual(mtimes(A, m2), C));
 }
@@ -1382,7 +1387,7 @@ unittest
     auto m = luSolve!(Yes.allowDestroy)('N', LU.lut, LU.ipiv, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, m), C));
 }
 
@@ -1404,7 +1409,7 @@ unittest
     auto m = luSolve('N', LU.lut, LU.ipiv, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, m), B));
 }
 
@@ -1435,7 +1440,7 @@ unittest
     auto m2 = luSolve!(Yes.allowDestroy)('N', LU.lut, LU.ipiv, B2);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, m), C));
     assert(equal!approxEqual(mtimes(A.transposed, m2), C));
 }
@@ -1465,7 +1470,7 @@ unittest
     auto m = luSolve('N', LU.lut, LU.ipiv, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, m), B));
 }
 
@@ -1485,7 +1490,7 @@ unittest
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     import std.math: approxEqual;
     assert(res.equal!approxEqual(B));
 }
@@ -1507,7 +1512,7 @@ unittest
     auto res = mtimes(LU.l, LU.u);
     moveRows(res, LU.ipiv);
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     import std.math: approxEqual;
     assert(res.equal!approxEqual(C));
 }
@@ -1653,7 +1658,7 @@ unittest
     auto X = LDL.solve(B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B));
 }
 
@@ -1681,7 +1686,7 @@ unittest
     auto X = ldlSolve!(Yes.allowDestroy)(LDL.uplo, A, LDL.ipiv, B.transposed);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A_, X), B_.transposed));
 }
 
@@ -1701,7 +1706,7 @@ unittest
     auto X = LDL.solve(B);
     
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B_));
 }
 
@@ -1830,7 +1835,7 @@ unittest
     auto X = C.solve(B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B));
 }
 
@@ -1850,7 +1855,7 @@ unittest
     auto X = choleskySolve!(Yes.allowDestroy)(C.uplo, C.matrix, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), C_));
 }
 
@@ -1875,7 +1880,7 @@ unittest
     auto X = choleskySolve(C.uplo, C.matrix, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B));
 }
 
@@ -2003,7 +2008,7 @@ unittest
     auto X = C.solve(B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B));
 }
 
@@ -2023,7 +2028,7 @@ unittest
     auto X = qrSolve(C.matrix, C.tau, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B_));
 }
 
@@ -2046,7 +2051,7 @@ unittest
     auto X = qrSolve(C.matrix, C.tau, B);
 
     import std.math: approxEqual;
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     
     assert(equal!approxEqual(mtimes(A, X), B));
 }
@@ -2070,6 +2075,6 @@ unittest
     auto X = qrSolve(C.matrix, C.tau, B);
     auto res = mtimes(A, X);
 
-    import mir.ndslice.algorithm: equal;
+    import mir.algorithm.iteration: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, B));
 }
