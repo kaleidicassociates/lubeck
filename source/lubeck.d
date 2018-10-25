@@ -1328,7 +1328,7 @@ unittest
     
     import mir.random.variable;
     import mir.random.algorithm;
-    auto B = randomSlice!double(uniformVar(-100, 100), 5, 100);
+    auto B = randomSlice(uniformVar(-100, 100), 5, 100);
     
     auto LU = A.luDecomp();
     auto X = LU.solve('N', B);
@@ -1652,7 +1652,7 @@ unittest
 
     import mir.random.variable;
     import mir.random.algorithm;
-    auto B = randomSlice!double(uniformVar(-100, 100), 4, 100);
+    auto B = randomSlice(uniformVar(-100, 100), 4, 100);
 
     auto LDL = ldlDecomp('L', A);
     auto X = LDL.solve(B);
@@ -1829,7 +1829,7 @@ unittest
     
     import mir.random.variable;
     import mir.random.algorithm;
-    auto B = randomSlice!double(uniformVar(-100, 100), 3, 100);
+    auto B = randomSlice(uniformVar(-100, 100), 3, 100);
 
     auto C = choleskyDecomp('L', A);
     auto X = C.solve(B);
@@ -2002,7 +2002,7 @@ unittest
 
     import mir.random.variable;
     import mir.random.algorithm;
-    auto B = randomSlice!double(uniformVar(-100, 100), 4, 100);
+    auto B = randomSlice(uniformVar(-100, 100), 4, 100);
 
     auto C = qrDecomp(A);
     auto X = C.solve(B);
