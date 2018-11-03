@@ -5,7 +5,7 @@ lapack_d_dep = dependency('lapack-d', fallback : ['lapack', 'lapack_dep'])
 mir_algorithm_dep = dependency('mir-algorithm', fallback : ['mir-algorithm', 'mir_algorithm_dep'])
 mir_blas_dep = dependency('mir-blas', fallback : ['mir-blas', 'mir_blas_dep'])
 mir_lapack_dep = dependency('mir-lapack', fallback : ['mir-lapack', 'mir_lapack_dep'])
-mir_random_dep = dependency('mir-random', fallback : ['mir-random', 'mir_random_dep'])
+mir_random_dep = dependency('mir-random', fallback : ['mir-random', 'mir_random_dep'], default_options : ['extended=true'] )
 
 required_deps = [
     cblas_d_dep,
