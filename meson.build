@@ -45,7 +45,6 @@ lubeck_test_exe = executable(meson.project_name() + '-test',
     lubeck_src,
     include_directories: lubeck_dir,
     d_unittest: true,
-    d_module_versions: ['mir_test'],
     link_args: '-main',
     dependencies: required_deps,
 )
