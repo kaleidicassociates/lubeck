@@ -41,14 +41,6 @@ lubeck_dep = declare_dependency(
     dependencies: required_deps,
 )
 
-lubeck_test_exe = executable(meson.project_name() + '-test',
-    lubeck_src,
-    include_directories: lubeck_dir,
-    d_unittest: true,
-    link_args: '-main',
-    dependencies: required_deps,
-)
-
 install_subdir('source/',
     strip_directory : true,
     install_dir: 'include/d/' + meson.project_name(),
@@ -62,4 +54,16 @@ import('pkgconfig').generate(
     version: meson.project_version(),
 )
 
-test(meson.project_name() + '-test', lubeck_test_exe)
+if get_option('with_test')
+
+    lubeck_test_exe = executable(meson.project_name() + '-test',
+        lubeck_src,
+        include_directories: lubeck_dir,
+        d_unittest: true,
+        link_args: '-main',
+        dependencies: required_deps,
+    )
+
+    test(meson.project_name() + '-test', lubeck_test_exe)
+
+endif
