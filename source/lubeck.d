@@ -7,6 +7,7 @@ module lubeck;
 
 import cblas : Diag;
 import mir.blas;
+import mir.internal.utility : realType, isComplex;
 import mir.lapack;
 import mir.math.common;
 import mir.ndslice.allocation;
@@ -468,19 +469,37 @@ Slice!(BlasType!(IteratorA, IteratorB)*, 2)
     }
     else
     {
-        size_t liwork = void;
-        auto lwork = gelsd_wq(a_, b_, liwork);
-        auto s = min(a_.length!0, a_.length!1).uninitSlice!C;
-        auto work = lwork.uninitSlice!C;
-        auto iwork = liwork.uninitSlice!lapackint;
-        size_t rank;
-        C rcond = -1;
-        
-        auto info = gelsd(a_, b_, s, rcond, rank, work, iwork);
+        static if(!isComplex!C)
+        {
+            size_t liwork = void;
+            auto lwork = gelsd_wq(a_, b_, liwork);
+            auto s = min(a_.length!0, a_.length!1).uninitSlice!C;
+            auto work = lwork.uninitSlice!C;
+            auto iwork = liwork.uninitSlice!lapackint;
+            size_t rank;
+            C rcond = -1;
+
+            auto info = gelsd(a_, b_, s, rcond, rank, work, iwork);
+        }
+        else
+        {
+            size_t liwork = void;
+            size_t lrwork = void;
+            auto lwork = gelsd_wq(a_, b_, liwork, lrwork);
+            auto s = min(a_.length!0, a_.length!1).uninitSlice!(realType!C);
+            auto work = lwork.uninitSlice!C;
+            auto iwork = liwork.uninitSlice!lapackint;
+            auto rwork = lrwork.uninitSlice!(realType!C);
+            size_t rank;
+            realType!C rcond = -1;
+
+            auto info = gelsd!C(a_, b_, s, rcond, rank, work, rwork, iwork);
+        }
 
         enforce(info == 0, to!string(info) ~ " off-diagonal elements of an intermediate bidiagonal form did not converge to zero.");
         b_ = b_[0 .. $, 0 .. a_.length!0];
     }
+
     return b_.universal.transposed.slice;
 }
 
@@ -497,72 +516,104 @@ Slice!(BlasType!(IteratorA, IteratorB)*)
 /// AX=B
 unittest
 {
-    auto a = [
-         1, -1,  1,
-         2,  2, -4,
-        -1,  5,  0].sliced(3, 3);
-    auto b = [
-         2.0,  0,
-        -6  , -6,
-         9  ,  1].sliced(3, 2);
-    auto t = [
-         1.0, -1,
-         2  ,  0,
-         3  ,  1].sliced(3, 2);
+    foreach(C; AliasSeq!(double, cdouble))
+    {
+        static if(isComplex!C)
+            enum transform = "a+0i";
+        else
+            enum transform = "a";
 
-    auto x = mldivide(a, b);
-    assert(x == t);
+        auto a = [
+            1, -1,  1,
+            2,  2, -4,
+            -1,  5,  0].sliced(3, 3).map!transform;
+        auto b = [
+            2.0,  0,
+            -6  , -6,
+            9  ,  1].sliced(3, 2).map!transform;
+        auto t = [
+            1.0, -1,
+            2  ,  0,
+            3  ,  1].sliced(3, 2).map!transform;
+
+        auto x = mldivide(a, b);
+        assert(x == t);
+    }
 }
 
 /// Ax=B
 unittest
 {
-    auto a = [
-         1, -1,  1,
-         2,  2, -4,
-        -1,  5,  0].sliced(3, 3);
-    auto b = [
-         2.0,
-        -6  ,
-         9  ].sliced(3);
-    auto t = [
-         1.0,
-         2  ,
-         3  ].sliced(3);
+    foreach(C; AliasSeq!(double, cdouble))
+    {
+        static if(isComplex!C)
+            enum transform = "a+0i";
+        else
+            enum transform = "a";
 
-    auto x = mldivide(a, b);
-    assert(x == t);
+        auto a = [
+            1, -1,  1,
+            2,  2, -4,
+            -1,  5,  0].sliced(3, 3).map!transform;
+        auto b = [
+            2.0,
+            -6  ,
+            9  ].sliced(3).map!transform;
+        auto t = [
+            1.0,
+            2  ,
+            3  ].sliced(3).map!transform;
+
+        auto x = mldivide(a, b);
+        assert(x == t);
+    }
 }
 
 /// Least-Squares Solution of Underdetermined System
 unittest
 {
-    auto a = [
-        -0.57,  -1.28,  -0.39,   0.25,
-        -1.93,   1.08,  -0.31,  -2.14,
-         2.30,   0.24,   0.40,  -0.35,
-        -1.93,   0.64,  -0.66,   0.08,
-         0.15,   0.30,   0.15,  -2.13,
-        -0.02,   1.03,  -1.43,   0.50,
-        ].sliced(6, 4);
+    foreach(C; AliasSeq!(double, cdouble))
+    {
+        static if(isComplex!C)
+            enum transform = "a+0i";
+        else
+            enum transform = "a";
 
-    auto b = [
-     -2.67,
-     -0.55,
-      3.34,
-     -0.77,
-      0.48,
-      4.10,
-    ].sliced;
+        auto a = [
+            -0.57,  -1.28,  -0.39,   0.25,
+            -1.93,   1.08,  -0.31,  -2.14,
+            2.30,   0.24,   0.40,  -0.35,
+            -1.93,   0.64,  -0.66,   0.08,
+            0.15,   0.30,   0.15,  -2.13,
+            -0.02,   1.03,  -1.43,   0.50,
+            ].sliced(6, 4).map!transform;
 
-    auto x = [
-        1.5339,
-        1.8707,
-       -1.5241,
-        0.0392].sliced;
+        auto b = [
+        -2.67,
+        -0.55,
+        3.34,
+        -0.77,
+        0.48,
+        4.10,
+        ].sliced.map!transform;
 
-    import std.math: approxEqual;
-    assert(a.mldivide(b).approxEqual(x));
+        auto x = [
+            1.5339,
+            1.8707,
+            -1.5241,
+            0.0392].sliced.map!transform;
+
+        import std.math: approxEqual;
+        static if(isComplex!C)
+        {
+            assert(a.mldivide(b).map!"a.re".approxEqual(x.map!"a.re"));
+            assert(a.mldivide(b).map!"a.im".approxEqual(x.map!"a.im"));
+        }
+        else
+        {
+            assert(a.mldivide(b).approxEqual(x));
+        }
+    }
 }
 
 /// Principal component analises result.
