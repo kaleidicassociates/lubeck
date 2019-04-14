@@ -2036,14 +2036,14 @@ unittest
     auto val_matrix = val.matrix.slice;
     auto val_tau = val.tau.slice;
     
-	auto r = val.R;
+    auto r = val.R;
     assert(equal!approxEqual(val.R, R_test));
     
     auto q = val.Q;
     assert(equal!approxEqual(val.Q, Q_test));
 
     //double-checking values do not change
-	assert(equal!approxEqual(val_matrix, val.matrix));
+    assert(equal!approxEqual(val_matrix, val.matrix));
     assert(equal!approxEqual(val_tau, val.tau));
     
     auto a = val.reconstruct;
