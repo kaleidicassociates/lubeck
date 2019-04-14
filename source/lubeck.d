@@ -1960,6 +1960,94 @@ struct QRResult(T)
     {
         return qrSolve!(allowDestroy)(matrix, tau, b);
     }
+    
+    /++
+    Extract the Q matrix
+    +/
+    auto Q(Flag!"allowDestroy" allowDestroy = No.allowDestroy)
+    {
+        auto work = [T.sizeof * matrix.length].uninitSlice!T;
+        
+        auto a = matrix.slice;
+        auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
+        
+    	static if(is(T == double) || is(T == float))
+        	orgqr!T(m, tau, work);
+    	else
+        	ungqr!T(m, tau, work);
+        return m.transposed;
+    }
+    
+    /++
+    Extract the R matrix
+    +/
+    auto R()
+    {
+        auto r = uninitSlice!T(matrix.shape).universal;
+        
+		for (size_t i = 0; i < r.length; i++)
+        {
+            r[i, i .. $] = matrix[i .. $, i];
+    	}
+        return r;
+    }
+    
+    /++
+    Reconstruct the original matrix given a QR decomposition
+    +/
+    auto reconstruct()
+    {
+        auto r = R();
+        auto q = Q();
+        return mtimes(q, r);
+    }
+}
+
+///
+unittest
+{
+    import std.math: approxEqual;
+    import mir.ndslice : equal;
+    
+    auto A =
+            [ 1,  1,  0,
+              1,  0,  1,
+              0,  1,  1 ]
+              .sliced(3, 3)
+              .as!double.slice;
+
+    auto Q_test =
+            [ -0.7071068,  0.4082483,  -0.5773503,
+              -0.7071068, -0.4082483,   0.5773503,
+                       0,  0.8164966,   0.5773503]
+              .sliced(3, 3)
+              .as!double.slice;
+
+    auto R_test =
+            [ -1.414214,  -0.7071068,  -0.7071068,
+                     0,  1.2247449,    0.4082483,
+                     0,          0,    1.1547005]
+              .sliced(3, 3)
+              .as!double.slice;
+
+	auto val = qrDecomp2(A);
+    
+    //saving these values to doublecheck they don't change later
+    auto val_matrix = val.matrix.slice;
+    auto val_tau = val.tau.slice;
+    
+	auto r = val.R;
+    assert(equal!approxEqual(val.R, R_test));
+    
+    auto q = val.Q;
+    assert(equal!approxEqual(val.Q, Q_test));
+
+    //double-checking values do not change
+	assert(equal!approxEqual(val_matrix, val.matrix));
+    assert(equal!approxEqual(val_tau, val.tau));
+    
+    auto a = val.reconstruct;
+    assert(equal!approxEqual(A, a));
 }
 
 /++
