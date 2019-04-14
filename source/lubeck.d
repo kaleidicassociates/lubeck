@@ -1966,7 +1966,7 @@ struct QRResult(T)
     +/
     auto Q(Flag!"allowDestroy" allowDestroy = No.allowDestroy)
     {
-        auto work = [T.sizeof * matrix.length].uninitSlice!T;
+        auto work = [matrix.length].uninitSlice!T;
         
         auto m = (allowDestroy && matrix._stride!1 == 1) ? matrix.assumeCanonical : matrix.as!T.slice.canonical;
         
