@@ -1968,8 +1968,7 @@ struct QRResult(T)
     {
         auto work = [T.sizeof * matrix.length].uninitSlice!T;
         
-        auto a = matrix.slice;
-        auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
+        auto m = (allowDestroy && matrix._stride!1 == 1) ? matrix.assumeCanonical : matrix.as!T.slice.canonical;
         
     	static if(is(T == double) || is(T == float))
         	orgqr!T(m, tau, work);
