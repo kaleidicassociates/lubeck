@@ -1986,7 +1986,7 @@ struct QRResult(T)
 
         auto r = matrix.transposed.slice;  
         r.eachLower!"a = 0";
-        return r;
+        return r.universal;
     }
     
     /++
@@ -1996,7 +1996,7 @@ struct QRResult(T)
     {
         auto r = R();
         auto q = Q();
-        return mtimes(q, r);
+        return mtimes(q, r).universal;
     }
 }
 
