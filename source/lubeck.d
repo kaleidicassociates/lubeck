@@ -2027,7 +2027,7 @@ unittest
               .sliced(3, 3)
               .as!double.slice;
 
-    auto val = qrDecomp2(A);
+    auto val = qrDecomp(A);
 
     //saving these values to doublecheck they don't change later
     auto val_matrix = val.matrix.slice;
