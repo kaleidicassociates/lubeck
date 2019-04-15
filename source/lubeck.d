@@ -1982,12 +1982,10 @@ struct QRResult(T)
     +/
     auto R()
     {
-        auto r = uninitSlice!T(matrix.shape).universal;
+        import mir.algorithm.iteration: eachLower;
 
-        for (size_t i = 0; i < r.length; i++)
-        {
-            r[i, i .. $] = matrix[i .. $, i];
-    	}
+        auto r = matrix.transposed.slice;  
+        r.eachLower!"a = 0";
         return r;
     }
     
