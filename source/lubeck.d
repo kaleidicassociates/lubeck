@@ -1967,13 +1967,13 @@ struct QRResult(T)
     auto Q(Flag!"allowDestroy" allowDestroy = No.allowDestroy)
     {
         auto work = [matrix.length].uninitSlice!T;
-        
+
         auto m = (allowDestroy && matrix._stride!1 == 1) ? matrix.assumeCanonical : matrix.as!T.slice.canonical;
-        
-    	static if(is(T == double) || is(T == float))
-        	orgqr!T(m, tau, work);
-    	else
-        	ungqr!T(m, tau, work);
+
+        static if(is(T == double) || is(T == float))
+            orgqr!T(m, tau, work);
+        else
+            ungqr!T(m, tau, work);
         return m.transposed;
     }
     
@@ -1983,8 +1983,8 @@ struct QRResult(T)
     auto R()
     {
         auto r = uninitSlice!T(matrix.shape).universal;
-        
-		for (size_t i = 0; i < r.length; i++)
+
+        for (size_t i = 0; i < r.length; i++)
         {
             r[i, i .. $] = matrix[i .. $, i];
     	}
@@ -2029,22 +2029,22 @@ unittest
               .sliced(3, 3)
               .as!double.slice;
 
-	auto val = qrDecomp2(A);
-    
+    auto val = qrDecomp2(A);
+
     //saving these values to doublecheck they don't change later
     auto val_matrix = val.matrix.slice;
     auto val_tau = val.tau.slice;
-    
+
     auto r = val.R;
     assert(equal!approxEqual(val.R, R_test));
-    
+
     auto q = val.Q;
     assert(equal!approxEqual(val.Q, Q_test));
 
     //double-checking values do not change
     assert(equal!approxEqual(val_matrix, val.matrix));
     assert(equal!approxEqual(val_tau, val.tau));
-    
+
     auto a = val.reconstruct;
     assert(equal!approxEqual(A, a));
 }
