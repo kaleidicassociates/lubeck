@@ -46,12 +46,9 @@ install_subdir('source/',
     install_dir: 'include/d/' + meson.project_name(),
 )
 
-import('pkgconfig').generate(
-    name: meson.project_name(),
+import('pkgconfig').generate(lubeck_lib,
     description: 'Optimisation Framework',
     subdirs: 'd/' + meson.project_name(),
-    libraries: [lubeck_lib],
-    version: meson.project_version(),
 )
 
 if get_option('with_test')
