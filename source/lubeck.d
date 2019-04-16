@@ -1985,7 +1985,7 @@ struct QRResult(T)
         import mir.algorithm.iteration: eachLower;
 
         auto r = matrix.transposed.slice;  
-        r.eachLower!"a = 0";
+        r.eachLower!("a = cast(" ~ T.stringof ~ ")0");
         return r.universal;
     }
     
