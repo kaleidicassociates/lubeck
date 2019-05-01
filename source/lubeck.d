@@ -2090,7 +2090,7 @@ unittest
 
     import std.math: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(C.matrix, matrix_check));
+    assert(equal!approxEqual(C.matrix.transposed, matrix_check));
     assert(equal!approxEqual(C.tau, tau_check));
 }
 
