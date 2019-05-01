@@ -2067,6 +2067,33 @@ auto qrDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
     return QRResult!T(m, tau);
 }
 
+///
+unittest
+{
+    auto A =
+            [  3,  -6,
+               4,  -8,
+               0,   1]
+              .sliced(3, 2)
+              .as!double.slice;
+
+    auto matrix_check =
+            [ -5.0,  10,
+               0.8,  -1,
+               0.0,   1]
+              .sliced(3, 2)
+              .as!double.slice;
+
+    auto tau_check = [ 1.6, 1.0].sliced(2).as!double.slice;
+
+    auto C = qrDecomp(A);
+
+    import std.math: approxEqual;
+    import mir.algorithm.iteration: equal;
+    assert(equal!approxEqual(C.matrix, matrix_check));
+    assert(equal!approxEqual(C.tau, tau_check));
+}
+
 /++
 Solve the least squares problem:
     \min ||A * X - B||
@@ -2147,7 +2174,6 @@ unittest
     import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B));
 }
-
 
 unittest
 {
