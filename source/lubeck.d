@@ -14,6 +14,7 @@ import mir.ndslice.allocation;
 import mir.ndslice.dynamic: transposed;
 import mir.ndslice.slice;
 import mir.ndslice.topology;
+import mir.ndslice.traits : isMatrix;
 import mir.utility;
 import std.meta;
 import std.traits;
@@ -1960,6 +1961,142 @@ struct QRResult(T)
     {
         return qrSolve!(allowDestroy)(matrix, tau, b);
     }
+    
+    /++
+    Extract the Q matrix
+    +/
+    auto Q(Flag!"allowDestroy" allowDestroy = No.allowDestroy)
+    {
+        auto work = [matrix.length].uninitSlice!T;
+
+        auto m = (allowDestroy && matrix._stride!1 == 1) ? matrix.assumeCanonical : matrix.as!T.slice.canonical;
+
+        static if(is(T == double) || is(T == float))
+            orgqr!T(m, tau, work);
+        else
+            ungqr!T(m, tau, work);
+        return m.transposed;
+    }
+    
+    /++
+    Extract the R matrix
+    +/
+    auto R()
+    {
+        import mir.algorithm.iteration: eachLower;
+
+        auto r = [tau.length, tau.length].uninitSlice!T;
+        if (matrix.shape[0] == matrix.shape[1]) {
+            r[] = matrix.transposed.slice;
+        } else {
+            r[] = matrix[0..tau.length, 0..tau.length].transposed.slice;
+        }
+        r.eachLower!("a = cast(" ~ T.stringof ~ ")0");
+        return r.universal;
+    }
+
+    /++
+    Reconstruct the original matrix given a QR decomposition
+    +/
+    auto reconstruct()
+    {
+        auto q = Q();
+        auto r = R();
+        return reconstruct(q, r);
+    }
+
+    /++
+    Reconstruct the original matrix given a QR decomposition
+    +/
+    auto reconstruct(T, U)(T q, U r)
+        if (isMatrix!T && isMatrix!U)
+    {
+        return mtimes(q, r).universal;
+    }
+}
+
+///
+unittest
+{
+    import std.math: approxEqual;
+    import mir.ndslice : equal;
+    
+    auto A =
+            [ 1,  1,  0,
+              1,  0,  1,
+              0,  1,  1 ]
+              .sliced(3, 3)
+              .as!double.slice;
+
+    auto Q_test =
+            [ -0.7071068,  0.4082483,  -0.5773503,
+              -0.7071068, -0.4082483,   0.5773503,
+                       0,  0.8164966,   0.5773503]
+              .sliced(3, 3)
+              .as!double.slice;
+
+    auto R_test =
+            [ -1.414214,  -0.7071068,   -0.7071068,
+                      0,   1.2247449,    0.4082483,
+                      0,           0,    1.1547005]
+              .sliced(3, 3)
+              .as!double.slice;
+
+    auto val = qrDecomp(A);
+
+    //saving these values to doublecheck they don't change later
+    auto val_matrix = val.matrix.slice;
+    auto val_tau = val.tau.slice;
+
+    auto r = val.R;
+    assert(equal!approxEqual(val.R, R_test));
+
+    auto q = val.Q;
+    assert(equal!approxEqual(val.Q, Q_test));
+
+    //double-checking values do not change
+    assert(equal!approxEqual(val_matrix, val.matrix));
+    assert(equal!approxEqual(val_tau, val.tau));
+
+    auto a = val.reconstruct;
+    assert(equal!approxEqual(A, a));
+}
+
+unittest
+{
+    import std.math: approxEqual;
+    import mir.ndslice : equal;
+
+    auto A =
+            [  3,  -6,
+               4,  -8,
+               0,   1]
+              .sliced(3, 2)
+              .as!double.slice;
+
+    auto Q_check =
+            [ -0.6,  0,
+              -0.8,  0,
+               0.0, -1]
+              .sliced(3, 2)
+              .as!double.slice;
+
+    auto R_check =
+            [ -5,  10,
+               0,  -1]
+              .sliced(2, 2)
+              .as!double.slice;
+
+    auto C = qrDecomp(A);
+    auto q = C.Q;
+    auto r = C.R;
+    auto A_reconstructed = C.reconstruct(q, r);
+
+    import std.math: approxEqual;
+    import mir.algorithm.iteration: equal;
+    assert(equal!approxEqual(q, Q_check));
+    assert(equal!approxEqual(r, R_check));
+    assert(equal!approxEqual(A_reconstructed, A));
 }
 
 /++
@@ -2062,7 +2199,6 @@ unittest
     import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B));
 }
-
 
 unittest
 {
