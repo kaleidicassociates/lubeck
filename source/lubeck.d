@@ -14,6 +14,7 @@ import mir.ndslice.allocation;
 import mir.ndslice.dynamic: transposed;
 import mir.ndslice.slice;
 import mir.ndslice.topology;
+import mir.ndslice.traits : isMatrix;
 import mir.utility;
 import std.meta;
 import std.traits;
@@ -1984,18 +1985,32 @@ struct QRResult(T)
     {
         import mir.algorithm.iteration: eachLower;
 
-        auto r = matrix.transposed.slice;  
+        auto r = [tau.length, tau.length].uninitSlice!T;
+        if (matrix.shape[0] == matrix.shape[1]) {
+            r[] = matrix.transposed.slice;
+        } else {
+            r[] = matrix[0..tau.length, 0..tau.length].transposed.slice;
+        }
         r.eachLower!("a = cast(" ~ T.stringof ~ ")0");
         return r.universal;
     }
-    
+
     /++
     Reconstruct the original matrix given a QR decomposition
     +/
     auto reconstruct()
     {
-        auto r = R();
         auto q = Q();
+        auto r = R();
+        return reconstruct(q, r);
+    }
+
+    /++
+    Reconstruct the original matrix given a QR decomposition
+    +/
+    auto reconstruct(T, U)(T q, U r)
+        if (isMatrix!T && isMatrix!U)
+    {
         return mtimes(q, r).universal;
     }
 }
@@ -2047,6 +2062,43 @@ unittest
     assert(equal!approxEqual(A, a));
 }
 
+unittest
+{
+    import std.math: approxEqual;
+    import mir.ndslice : equal;
+
+    auto A =
+            [  3,  -6,
+               4,  -8,
+               0,   1]
+              .sliced(3, 2)
+              .as!double.slice;
+
+    auto Q_check =
+            [ -0.6,  0,
+              -0.8,  0,
+               0.0, -1]
+              .sliced(3, 2)
+              .as!double.slice;
+
+    auto R_check =
+            [ -5,  10,
+               0,  -1]
+              .sliced(2, 2)
+              .as!double.slice;
+
+    auto C = qrDecomp(A);
+    auto q = C.Q;
+    auto r = C.R;
+    auto A_reconstructed = C.reconstruct(q, r);
+
+    import std.math: approxEqual;
+    import mir.algorithm.iteration: equal;
+    assert(equal!approxEqual(q, Q_check));
+    assert(equal!approxEqual(r, R_check));
+    assert(equal!approxEqual(A_reconstructed, A));
+}
+
 /++
 Computes a QR factorization of matrix 'a'.
 Params:
@@ -2065,33 +2117,6 @@ auto qrDecomp(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
 
     geqrf!T(m, tau, work);
     return QRResult!T(m, tau);
-}
-
-///
-unittest
-{
-    auto A =
-            [  3,  -6,
-               4,  -8,
-               0,   1]
-              .sliced(3, 2)
-              .as!double.slice;
-
-    auto matrix_check =
-            [ -5.0,  10,
-               0.8,  -1,
-               0.0,   1]
-              .sliced(3, 2)
-              .as!double.slice;
-
-    auto tau_check = [ 1.6, 1.0].sliced(2).as!double.slice;
-
-    auto C = qrDecomp(A);
-
-    import std.math: approxEqual;
-    import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(C.matrix.transposed, matrix_check));
-    assert(equal!approxEqual(C.tau, tau_check));
 }
 
 /++
