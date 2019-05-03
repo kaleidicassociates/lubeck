@@ -2018,9 +2018,6 @@ struct QRResult(T)
 ///
 unittest
 {
-    import std.math: approxEqual;
-    import mir.ndslice : equal;
-    
     auto A =
             [ 1,  1,  0,
               1,  0,  1,
@@ -2048,6 +2045,9 @@ unittest
     auto val_matrix = val.matrix.slice;
     auto val_tau = val.tau.slice;
 
+    import std.math: approxEqual;
+    import mir.ndslice : equal;
+    
     auto r = val.R;
     assert(equal!approxEqual(val.R, R_test));
 
@@ -2064,9 +2064,6 @@ unittest
 
 unittest
 {
-    import std.math: approxEqual;
-    import mir.ndslice : equal;
-
     auto A =
             [  3,  -6,
                4,  -8,
