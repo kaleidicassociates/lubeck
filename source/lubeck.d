@@ -2140,7 +2140,6 @@ auto qrSolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy,
             )
 in
 {
-    assert(a.length!0 == a.length!1, "matrix must be squared");
     assert(a.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
 body
@@ -2172,6 +2171,11 @@ body
         ormqr!T('L', 'T', a_, tau_, m, work);
     else
         unmqr!T('L', 'C', a_, tau_, m, work);
+
+    if (a_.length!0 != a_.length!1) {
+        a_ = a_[0..tau.length, 0..tau.length];
+        m = m.selectFront!1(tau.length);
+    }
     trsm!T(Side.Right, Uplo.Lower, Diag.NonUnit, cast(T) 1.0, a_, m);
 
     return m.transposed;
@@ -2264,4 +2268,29 @@ unittest
 
     import mir.algorithm.iteration: equal;
     assert(equal!((a, b) => fabs(a - b) < 1e-12)(res, B));
+}
+
+unittest
+{
+    auto A =
+            [  3,  -6,
+               4,  -8,
+               0,   1]
+              .sliced(3, 2)
+              .as!double.slice;
+
+    auto B = [-1, 7, 2]
+               .sliced(3)
+               .as!double.slice.canonical;
+
+    auto X_check = [5, 2]
+                    .sliced(2, 1)
+                    .as!double.slice;
+
+    auto C = qrDecomp(A);
+    auto X = qrSolve(C.matrix, C.tau, B);
+
+    import std.math: approxEqual;
+    import mir.algorithm.iteration: equal;
+    assert(equal!approxEqual(X, X_check));
 }
