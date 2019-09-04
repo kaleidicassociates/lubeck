@@ -486,7 +486,7 @@ Slice!(BlasType!(IteratorA, IteratorB)*, 2)
         {
             size_t liwork = void;
             size_t lrwork = void;
-            auto lwork = gelsd_wq(a_, b_, liwork, lrwork);
+            auto lwork = gelsd_wq(a_, b_, lrwork, liwork);
             auto s = min(a_.length!0, a_.length!1).uninitSlice!(realType!C);
             auto work = lwork.uninitSlice!C;
             auto iwork = liwork.uninitSlice!lapackint;
