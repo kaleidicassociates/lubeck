@@ -4,7 +4,7 @@ authors "Ilya Yaroshenko" "Lars Tandle Kyllingstad (SciD author)"
 copyright "Copyright © 2017, Symmetry Investments & Kaleidic Associates; Copyright (c) 2009, Lars T. Kyllingstad (SciD)"
 license "BSL-1.0"
 
-dependency "mir-lapack" version="~>1.1.0"
+dependency "mir-lapack" version="~>1.2.1"
 
 configuration "library" {
 	targetType "library"
@@ -12,7 +12,7 @@ configuration "library" {
 }
 
 configuration "unittest" {
-	dependency "mir-random" version=">=2.0.0"
+	dependency "mir-random" version=">=2.2.5"
 }
 
 configuration "openblas" {
@@ -72,31 +72,31 @@ configuration "zerolib" {
 }
 
 configuration "unittest-openblas" {
-	dependency "mir-random" version=">=2.0.0"
+	dependency "mir-random" version=">=2.2.5"
 	subConfiguration "mir-lapack" "openblas"
 }
 
 configuration "unittest-threelib" {
-	dependency "mir-random" version=">=2.0.0"
+	dependency "mir-random" version=">=2.2.5"
 	subConfiguration "mir-lapack" "threelib"
 }
 
 configuration "unittest-cblas" {
-	dependency "mir-random" version=">=2.0.0"
+	dependency "mir-random" version=">=2.2.5"
 	subConfiguration "mir-lapack" "cblas"
 }
 
 configuration "unittest-blas" {
-	dependency "mir-random" version=">=2.0.0"
+	dependency "mir-random" version=">=2.2.5"
 	subConfiguration "mir-lapack" "blas"
 }
 
 configuration "unittest-lapack" {
-	dependency "mir-random" version=">=2.0.0"
+	dependency "mir-random" version=">=2.2.5"
 	subConfiguration "mir-lapack" "lapack"
 }
 
 configuration "unittest-mkl-sequential" {
-	dependency "mir-random" version=">=2.0.0"
+	dependency "mir-random" version=">=2.2.5"
 	subConfiguration "mir-lapack" "mkl-sequential"
 }
