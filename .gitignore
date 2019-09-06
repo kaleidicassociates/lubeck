@@ -33,3 +33,10 @@ build/mir-lapack/
 build/cblas/
 build/lapack/
 build/mir-random/
+subprojects/cblas
+subprojects/mir-random
+subprojects/lapack
+subprojects/mir-algorithm
+subprojects/mir-blas
+subprojects/mir-core
+subprojects/mir-lapack
