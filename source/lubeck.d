@@ -44,7 +44,11 @@ private template IterationType(Iterator)
     }
 }
 
-private alias BlasType(Iterators...) =
+/++
+Gets the type that can be used with Blas routines that all types can be implicitly converted to. 
+
++/
+alias BlasType(Iterators...) =
     CommonType!(staticMap!(IterationType, Iterators));
 
 /++
