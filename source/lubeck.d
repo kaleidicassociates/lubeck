@@ -107,6 +107,8 @@ Slice!(BlasType!(IteratorA, IteratorB)*, 2)
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto a =
         [-5,  1,  7, 7, -4,
          -1, -5,  6, 3, -3,
@@ -146,6 +148,8 @@ unittest
 ///
 unittest
 {
+    import mir.ndslice;
+
     // from https://github.com/kaleidicassociates/lubeck/issues/3
     Slice!(float*, 2) a = slice!float(1, 1);
     Slice!(float*, 2, Universal) b1 = slice!float(16, 1).transposed;
@@ -222,6 +226,8 @@ Slice!(BlasType!(IteratorA, IteratorB)*)
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto a =
         [-5,  1,  7, 7, -4,
          -1, -5,  6, 3, -3,
@@ -268,6 +274,8 @@ CommonType!(BlasType!IteratorA, BlasType!IteratorB)
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto a = [1, 2, 4].sliced;
     auto b = [3, 4, 2].sliced;
     assert(a.mtimes(b) == 19);
@@ -302,6 +310,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto a =  [
         1, 0, 2,
         2, 2, 0,
@@ -407,6 +417,8 @@ auto svd(
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto a =  [
          7.52,  -1.10,  -7.95,   1.08,
         -0.76,   0.62,   9.34,  -7.10,
@@ -430,6 +442,8 @@ unittest
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto a =  [
          7.52,  -1.10,  -7.95,   1.08,
         -0.76,   0.62,   9.34,  -7.10,
@@ -691,6 +705,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice;
+
     import std.math: approxEqual;
     import mir.algorithm.iteration: equal;
 
@@ -779,6 +795,8 @@ Slice!(BlasType!Iterator*, 2)
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto a = [
         64,  2,  3, 61, 60,  6,
          9, 55, 54, 12, 13, 51,
@@ -846,6 +864,8 @@ Slice!(BlasType!Iterator*, 2)
 ///
 unittest
 {
+    import mir.ndslice;
+
     import std.stdio;
     import mir.ndslice;
 
@@ -989,6 +1009,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice;
+
     // Check for zero-determinant shortcut.
     auto ssing = [4, 2, 2, 1].sliced(2, 2);
     auto ssingd = det(ssing);
@@ -1094,6 +1116,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice;
+
     import mir.ndslice.slice: sliced;
     import mir.ndslice.topology: universal, map;
     import mir.ndslice.dynamic: transposed;
@@ -1149,6 +1173,8 @@ Returns:
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto A = 
            [ 9,  9,  9,
              8,  8,  8,
@@ -1372,6 +1398,8 @@ unittest
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto A =
         [ 1,  4, -3,  5,  6,
          -2,  8,  5,  7,  8,
@@ -1554,6 +1582,8 @@ unittest
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto B =
         [ 3, -7, -2,  2,
          -3,  5,  1,  0,
@@ -1697,6 +1727,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto A =
         [ 2.07,  3.87,  4.20, -1.15,
           3.87, -0.21,  1.87,  0.63,
@@ -1876,6 +1908,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto A =
            [ 25, 15, -5,
              15, 18,  0,
@@ -2022,6 +2056,8 @@ struct QRResult(T)
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto A =
             [ 1,  1,  0,
               1,  0,  1,
@@ -2185,6 +2221,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice;
+
     auto A =
             [ 3,  1, -1,  2,
              -5,  1,  3, -4,
