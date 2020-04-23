@@ -51,6 +51,8 @@ do
 @safe pure nothrow
 unittest
 {
+    import mir.ndslice;
+
     assert(eye(1)== [
         [1]]);
     assert(eye(2)== [
@@ -151,6 +153,8 @@ do
 @safe pure nothrow
 unittest
 {
+    import mir.ndslice;
+
     auto a = mininitRcslice!double(3, 5);
     auto b = mininitRcslice!double(5, 4);
 
@@ -176,6 +180,8 @@ unittest
 @safe pure nothrow
 unittest
 {
+    import mir.ndslice;
+
     auto a = mininitRcslice!cdouble(3, 5);
     auto b = mininitRcslice!cdouble(5, 4);
 
@@ -336,6 +342,8 @@ pure unittest {
 
 pure unittest
 {
+    import mir.ndslice;
+
     auto a =  mininitRcslice!double(6, 4);
     a[] = [
         -0.57,  -1.28,  -0.39,   0.25,
@@ -434,6 +442,8 @@ if A is not a square matrix.
 
 pure unittest
 {
+    import mir.ndslice;
+
     auto a = mininitRcslice!double(2, 2);
     a[] = [[1,0],
            [0,-1]];
@@ -444,6 +454,8 @@ pure unittest
 pure 
 unittest
 {
+    import mir.ndslice;
+
     auto a = mininitRcslice!double(2, 2);
     a[] = [[ 0, 1],
            [-1, 0]];
@@ -534,6 +546,8 @@ Returns: error code from CBlas
 
 pure unittest
 {
+    import mir.ndslice;
+
     auto a = mininitRcslice!double(6, 4);
     a[] = [[7.52,  -1.10,  -7.95,   1.08],
            [-0.76,   0.62,   9.34,  -7.10],
@@ -564,6 +578,8 @@ pure unittest
 
 pure unittest
 {
+    import mir.ndslice;
+
     auto a = mininitRcslice!double(6, 4);
     a[] =   [[7.52,  -1.10,  -7.95,   1.08],
             [-0.76,   0.62,   9.34,  -7.10],
@@ -667,6 +683,8 @@ struct QRResult(T)
 pure nothrow
 unittest
 {
+    import mir.ndslice;
+
     auto data = mininitRcslice!double(3, 3);
     data[] = [[12, -51,   4],
               [ 6, 167, -68],
@@ -746,6 +764,8 @@ EigenResult!(realType!T) eigen(T, SliceKind kind)(
 // pure
 unittest
 {
+    import mir.ndslice;
+
     auto data = 
         [[ 0, 1],
          [-1, 0]].fuse.as!double.rcslice;
@@ -766,6 +786,8 @@ unittest
 @safe pure
 unittest
 {
+    import mir.ndslice;
+
     auto data =
         [[0, 1, 0],
          [0, 0, 1],
@@ -982,6 +1004,8 @@ do
 pure
 unittest
 {
+    import mir.ndslice;
+
     auto data = mininitRcslice!double(3, 2);
     data[] = [[ 1, -1],
               [ 0,  1],
@@ -1015,6 +1039,8 @@ unittest
 pure
 unittest
 {
+    import mir.ndslice;
+
     auto data = mininitRcslice!double(10, 3);
     data[] = [[7, 4, 3],
               [4, 1, 8],
@@ -1080,6 +1106,8 @@ unittest
 pure
 unittest
 {
+    import mir.ndslice;
+
     auto data = mininitRcslice!double(13, 4);
     data[] =[[ 7,  26,   6,  60],
              [ 1,  29,  15,  52],
@@ -1208,7 +1236,9 @@ T median(T)(Slice!(const(T)*) data)
 ///
 @safe pure
 unittest
-{ //median tests
+{
+    import mir.ndslice;
+ //median tests
     auto a = mininitRcslice!double(3);
     a[] = [3, 1, 7];
     auto med = median!double(a.flattened);
@@ -1411,6 +1441,8 @@ Returns:
 ///
 @safe pure nothrow unittest
 {
+    import mir.ndslice;
+
     auto data = mininitRcslice!double(2,2);
     data[] = [[ 2, -1],
               [-2,  1]];
