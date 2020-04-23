@@ -19,6 +19,7 @@ import mir.utility;
 import std.meta;
 import std.traits;
 import std.typecons: Flag, Yes, No;
+public import mir.lapack: lapackint;
 
 version(LDC)
     import ldc.attributes: fastmath;
@@ -132,6 +133,8 @@ unittest
 /// ger specialized case in mtimes
 unittest
 {
+    import mir.ndslice;
+
     // from https://github.com/kaleidicassociates/lubeck/issues/8
     {
         auto a = [1.0f, 2.0f].sliced(2, 1);
@@ -442,6 +445,7 @@ unittest
 ///
 unittest
 {
+    import std.typecons: Yes;
     import mir.ndslice;
 
     auto a =  [
@@ -535,6 +539,9 @@ Slice!(BlasType!(IteratorA, IteratorB)*)
 /// AX=B
 unittest
 {
+    import std.meta: AliasSeq;
+    import mir.ndslice;
+
     foreach(C; AliasSeq!(double, cdouble))
     {
         static if(isComplex!C)
@@ -563,6 +570,9 @@ unittest
 /// Ax=B
 unittest
 {
+    import std.meta: AliasSeq;
+    import mir.ndslice;
+
     foreach(C; AliasSeq!(double, cdouble))
     {
         static if(isComplex!C)
@@ -1010,6 +1020,7 @@ body
 unittest
 {
     import mir.ndslice;
+    import mir.math;
 
     // Check for zero-determinant shortcut.
     auto ssing = [4, 2, 2, 1].sliced(2, 2);
@@ -1170,7 +1181,6 @@ Returns:
     }
 }
 
-///
 unittest
 {
     import mir.ndslice;
