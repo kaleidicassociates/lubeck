@@ -799,6 +799,7 @@ unittest
 {
     import mir.ndslice;
     import mir.math;
+    import mir.blas;
 
     auto data =
         [[0, 1, 0],
