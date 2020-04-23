@@ -544,7 +544,7 @@ unittest
 
     foreach(C; AliasSeq!(double, cdouble))
     {
-        static if(isComplex!C)
+        static if(is(C == cdouble))
             enum transform = "a+0i";
         else
             enum transform = "a";
@@ -575,7 +575,7 @@ unittest
 
     foreach(C; AliasSeq!(double, cdouble))
     {
-        static if(isComplex!C)
+        static if(is(C == cdouble))
             enum transform = "a+0i";
         else
             enum transform = "a";
@@ -601,9 +601,12 @@ unittest
 /// Least-Squares Solution of Underdetermined System
 unittest
 {
+    import std.meta: AliasSeq;
+    import mir.ndslice;
+
     foreach(C; AliasSeq!(double, )) //cdouble fails for DMD>=2085
     {
-        static if(isComplex!C)
+        static if(is(C == cdouble))
             enum transform = "a+0i";
         else
             enum transform = "a";
@@ -1408,6 +1411,7 @@ unittest
 ///
 unittest
 {
+    import mir.math;
     import mir.ndslice;
 
     auto A =
@@ -1589,7 +1593,6 @@ unittest
     assert(res.equal!approxEqual(B));
 }
 
-///
 unittest
 {
     import mir.ndslice;
