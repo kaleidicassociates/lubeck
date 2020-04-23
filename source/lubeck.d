@@ -636,7 +636,7 @@ unittest
             0.0392].sliced.map!transform;
 
         import std.math: approxEqual;
-        static if(isComplex!C)
+        static if(is(C == cdouble))
         {
             assert(a.mldivide(b).map!"a.re".approxEqual(x.map!"a.re"));
             assert(a.mldivide(b).map!"a.im".approxEqual(x.map!"a.im"));
