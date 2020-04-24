@@ -1,5 +1,5 @@
 import mir.ndslice.slice: sliced;
-import lubeck: mldivide;
+import kaleidic.lubeck: mldivide;
 
 // Solves AX=B
 int main()

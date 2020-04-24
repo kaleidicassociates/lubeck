@@ -3,7 +3,7 @@ $(H1 Lubeck - Linear Algebra)
 
 Authors: Ilya Yaroshenko, Lars Tandle Kyllingstad (SciD author)
 +/
-module lubeck;
+module kaleidic.lubeck;
 
 import cblas : Diag;
 import mir.blas;

@@ -19,8 +19,8 @@ endif
 has_cpp_headers = false
 
 sources_list = [
-    'lubeck',
-    'lubeck2',
+    'kaleidic/lubeck',
+    'kaleidic/lubeck2',
 ]
 
 sources = []

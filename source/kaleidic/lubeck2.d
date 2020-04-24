@@ -1,7 +1,7 @@
 /++
 $(H1 Lubeck 2 - `@nogc` Linear Algebra)
 +/
-module lubeck2;
+module kaleidic.lubeck2;
 
 import mir.algorithm.iteration: equal, each;
 import mir.blas;

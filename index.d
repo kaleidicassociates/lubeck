@@ -11,16 +11,19 @@ $(BOOKTABLE ,
         $(TH Description)
     )
     $(TR
-        $(TDNW $(LINK2 lubeck.html, lubeck))
+        $(TDNW $(MREF kaleidic, lubeck))
         $(TD First API that uses garbage collection for memory managment.)
     )
     $(TR
-        $(TDNW $(LINK2 lubeck2.html, lubeck2))
-        $(TD Second implementation that uses reference counted ndslices for memory managment.)
+        $(TDNW $(MREF kaleidic, lubeck2))
+        $(TD Second implementation that uses reference counted matrices and vectors.)
     )
 )
 
-$(LINK2 lubeck.html, lubeck) and $(LINK2 lubeck2.html, lubeck2) doesn't provide the same functionality or API, although many things are similar.
+$(BR)
+$(BR)
+
+$(MREF kaleidic, lubeck) and $(MREF kaleidic, lubeck2) doesn't provide the same functionality or API, although many things are similar.
 
 Macros:
         TITLE=Mir Optim
