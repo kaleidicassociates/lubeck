@@ -26,7 +26,7 @@ $(BR)
 $(MREF kaleidic, lubeck) and $(MREF kaleidic, lubeck2) doesn't provide the same functionality or API, although many things are similar.
 
 Macros:
-        TITLE=Mir Optim
-        WIKI=Mir Optim
+        TITLE=Lubeck
+        WIKI=Lubeck
         DDOC_BLANKLINE=
         _=
