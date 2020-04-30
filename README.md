@@ -38,7 +38,7 @@ libs "lapack" "blas"
 // or libs "openblas"
 import std.stdio;
 import mir.ndslice: magic, repeat, as, slice;
-import lubeck: mtimes;
+import kaleidic.lubeck: mtimes;
 
 void main()
 {
