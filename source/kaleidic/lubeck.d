@@ -910,14 +910,14 @@ body
 {
     import mir.algorithm.iteration: each;
     import mir.ndslice.topology: diagonal;
-    import mir.math.numeric: Prod;
+    import mir.math.numeric: ProdAccumulator;
 
     alias T = BlasType!Iterator;
 
     auto packed = uninitSlice!T(a.length * (a.length + 1) / 2);
     auto ipiv = a.length.uninitSlice!lapackint;
     int sign;
-    Prod!T prod;
+    ProdAccumulator!T prod;
     if (store == 'L')
     {
         auto pck = packed.stairs!"+"(a.length);
@@ -976,7 +976,7 @@ body
     }
     if(sign & 1)
         prod.x = -prod.x;
-    return prod.value;
+    return prod.prod;
 }
 
 /// ditto
@@ -988,7 +988,7 @@ in
 body
 {
     import mir.ndslice.topology: diagonal, zip, iota;
-    import mir.math.numeric: Prod;
+    import mir.math.numeric: ProdAccumulator;
 
     alias T = BlasType!Iterator;
 
@@ -1008,7 +1008,7 @@ body
     // of the upper triangular matrix. The array ipiv contains
     // the pivots.
     int sign;
-    Prod!T prod;
+    ProdAccumulator!T prod;
     foreach (tup; m.diagonal.zip(ipiv, [ipiv.length].iota(1)))
     {
         prod.put(tup.a);
@@ -1016,7 +1016,7 @@ body
     }
     if(sign & 1)
         prod.x = -prod.x;
-    return prod.value;
+    return prod.prod;
 }
 
 ///
@@ -1081,7 +1081,7 @@ body
 {
     import mir.algorithm.iteration: each;
     import mir.ndslice.topology: diagonal;
-    import mir.math.numeric: Prod;
+    import mir.math.numeric: ProdAccumulator;
 
     alias T = BlasType!Iterator;
 
