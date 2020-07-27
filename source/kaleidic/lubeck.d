@@ -840,7 +840,7 @@ Covariance matrix.
 
 Params:
     matrix = matrix whose rows represent observations and whose columns represent random variables.
-Reuturns:
+Returns:
     Normalized by `N-1` covariance matrix.
 +/
 Slice!(BlasType!Iterator*, 2)
