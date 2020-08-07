@@ -780,7 +780,7 @@ Params:
 Returns: Moore-Penrose pseudoinverse matrix
 +/
 Slice!(BlasType!Iterator*, 2)
-    pinv(Flag!"allowDestroy" allowDestroy = No.allowDestroy, Iterator, SliceKind kind)(Slice!(Iterator, 2, kind) matrix, BlasType!Iterator tolerance = BlasType!Iterator.nan)
+    pinv(Flag!"allowDestroy" allowDestroy = No.allowDestroy, Iterator, SliceKind kind)(Slice!(Iterator, 2, kind) matrix, double tolerance = double.nan)
 {
     import mir.algorithm.iteration: find, each;
     import std.math: nextUp;
@@ -1094,7 +1094,7 @@ body
     else
     {
         T[1] _vData = void;
-        auto z = _vData.sliced(1, 1);
+        auto z = _vData[].sliced(1, 1);
     }
     auto work = [a.length * 3].uninitSlice!T;
     size_t info = void;
