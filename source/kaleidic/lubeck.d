@@ -1031,6 +1031,11 @@ unittest
     assert (det(ssing) == 0);
     assert (detSymmetric('L', ssing) == 0);
 
+    // check determinant of empty matrix
+    assert(slice!double(0, 0).det == 1);
+    // check determinant of zero matrix
+    assert(repeat(0, 9).sliced(3, 3).det == 0);
+
     // General dense matrix.
     int dn = 101;
     auto d = uninitSlice!double(dn, dn);
