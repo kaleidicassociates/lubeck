@@ -445,6 +445,7 @@ unittest
 ///
 unittest
 {
+    import std.math: approxEqual;
     import std.typecons: Yes;
     import mir.ndslice;
 
@@ -460,6 +461,42 @@ unittest
     auto r = a.svd(Yes.slim);
     assert(r.u.shape == [6, 4]);
     assert(r.vt.shape == [4, 4]);
+
+    u_expected = [[-0.5726737 ,  0.1775627 ,  0.0056271 ,  0.52902201, -0.36919986,  0.4736157 ],
+                  [ 0.45942229, -0.10752776, -0.72402666,  0.41737321,  0.13722622,  0.24519971],
+                  [-0.45044682, -0.41395666,  0.00417222,  0.3628596 ,  0.63616578, -0.29890829],
+                  [ 0.33409639, -0.69262324,  0.494818  ,  0.18512862, -0.17527229,  0.31434824],
+                  [-0.31739725, -0.30837134, -0.28034658, -0.60982975,  0.18919257,  0.56381357],
+                  [ 0.21380422,  0.45905264,  0.39025282,  0.0900183 ,  0.61126044,  0.45773196]];
+    sigma_expected = [18.36597845,  13.62997968,  10.85333573,  4.49156909];
+    vt_expected = [[-0.51664471, -0.12123225,  0.84706383, -0.02939123],
+                   [ 0.07861311, -0.99232861, -0.09452544, -0.01299383],
+                   [-0.28063941, -0.02120364, -0.14127098,  0.94912298],
+                   [ 0.80507127,  0.01170762,  0.50357751,  0.31326168]];
+    assert(r.vt.approxEqual(vt_expected));
+    assert(r.sigma.approxEqual(sigma_expected));
+    assert(r.u.approxEqual(u_expected));
+}
+
+unittest
+{
+    // empty matrix as input means that u or vt is identity matrix
+    auto identity = slice!double([4, 4], 0);
+    identity.diagonal[] = 1;
+
+    auto a = slice!double(0, 4);
+    auto res = a.svd;
+
+    assert(res.u.shape == [0, 0]);
+    assert(res.vt.shape == [4, 4]);
+    assert(approxEqual(res.vt, identity));
+
+    auto b = slice!double(4, 0);
+    res = b.svd;
+
+    assert(res.u.shape == [4, 4]);
+    assert(res.vt.shape == [0, 0]);
+    assert(approxEqual(res.u, identity));
 }
 
 /++
