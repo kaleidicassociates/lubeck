@@ -1848,6 +1848,7 @@ unittest
     assert(equal!approxEqual(mtimes(A, X), B_));
 }
 
+///
 struct choleskyResult(T)
 {
     /++
@@ -2023,7 +2024,6 @@ unittest
     import mir.algorithm.iteration: equal;
     assert(equal!approxEqual(mtimes(A, X), B));
 }
-
 
 ///
 struct QRResult(T)
