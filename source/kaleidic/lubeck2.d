@@ -511,29 +511,39 @@ Returns: error code from CBlas
     auto u = mininitRcslice!T(slim ? s.length : m, m);
     auto vt = mininitRcslice!T(n, slim ? s.length : n);
 
-    static if (algorithm == "gesvd")
+    if (m == 0 || n == 0)
     {
-        auto jobu = slim ? 'S' : 'A';
-        auto jobvt = slim ? 'S' : 'A';
-        auto rca_sliced = a.as!T.rcslice;
-        auto rca = rca_sliced.lightScope.canonical;
-        auto rcwork = gesvd_wq(jobu, jobvt, rca, u.lightScope.canonical, vt.lightScope.canonical).mininitRcslice!T;
-        auto work = rcwork.lightScope;
-        auto info = gesvd(jobu, jobvt, rca, s.lightScope, u.lightScope.canonical, vt.lightScope.canonical, work);
+        u.lightScope[] = 0;
+        u.lightScope.diagonal[] = 1;
+        vt.lightScope[] = 0;
+        vt.lightScope.diagonal[] = 1;
     }
-    else // gesdd
+    else
     {
-        auto rciwork = mininitRcslice!lapackint(s.length * 8);
-        auto iwork = rciwork.lightScope;
-        auto jobz = slim ? 'S' : 'A';
-        auto rca_sliced = a.as!T.rcslice;
-        auto rca = rca_sliced.lightScope.canonical;
-        auto rcwork = gesdd_wq(jobz, rca, u.lightScope, vt.lightScope).minitRcslice!T;
-        auto work = rcwork.lightScope;
-        auto info = gesdd(jobz, rca, s.lightScope, u.lightScope, vt.lightScope, work, iwork);
+        static if (algorithm == "gesvd")
+        {
+            auto jobu = slim ? 'S' : 'A';
+            auto jobvt = slim ? 'S' : 'A';
+            auto rca_sliced = a.as!T.rcslice;
+            auto rca = rca_sliced.lightScope.canonical;
+            auto rcwork = gesvd_wq(jobu, jobvt, rca, u.lightScope.canonical, vt.lightScope.canonical).mininitRcslice!T;
+            auto work = rcwork.lightScope;
+            auto info = gesvd(jobu, jobvt, rca, s.lightScope, u.lightScope.canonical, vt.lightScope.canonical, work);
+        }
+        else // gesdd
+        {
+            auto rciwork = mininitRcslice!lapackint(s.length * 8);
+            auto iwork = rciwork.lightScope;
+            auto jobz = slim ? 'S' : 'A';
+            auto rca_sliced = a.as!T.rcslice;
+            auto rca = rca_sliced.lightScope.canonical;
+            auto rcwork = gesdd_wq(jobz, rca, u.lightScope, vt.lightScope).minitRcslice!T;
+            auto work = rcwork.lightScope;
+            auto info = gesdd(jobz, rca, s.lightScope, u.lightScope, vt.lightScope, work, iwork);
+        }
+        enum msg = (algorithm == "gesvd" ? "svd: DBDSDC did not converge, updating process failed" : "svd: DBDSQR did not converge");
+        enforce!("svd: " ~ msg)(!info);
     }
-    enum msg = (algorithm == "gesvd" ? "svd: DBDSDC did not converge, updating process failed" : "svd: DBDSQR did not converge");
-    enforce!("svd: " ~ msg)(!info);
     return SvdResult!T(vt, s, u); //transposed
 }
 
@@ -606,6 +616,31 @@ pure unittest
     assert(equal!((a, b) => fabs(a-b)< 1e-8)(a, m1));
 }
 
+unittest
+{
+    import mir.algorithm.iteration: all;
+
+    // empty matrix as input means that u or vt is identity matrix
+    auto identity = slice!double([4, 4], 0);
+    identity.diagonal[] = 1;
+
+    auto a = slice!double(0, 4);
+    auto res = a.svd;
+
+    import mir.conv: to;
+
+    assert(res.u.shape == [0, 0]);
+    assert(res.vt.shape == [4, 4]);
+    assert(res.vt.all!approxEqual(identity), res.vt.to!string);
+
+    auto b = slice!double(4, 0);
+    res = b.svd;
+
+    assert(res.u.shape == [4, 4]);
+    assert(res.vt.shape == [0, 0]);
+
+    assert(res.u.all!approxEqual(identity), res.u.to!string);
+}
 
 struct EigenResult(T)
 {
