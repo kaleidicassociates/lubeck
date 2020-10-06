@@ -395,25 +395,34 @@ auto svd(
     auto u = uninitSlice!T(slim ? s.length : m, m);
     auto vt = uninitSlice!T(n, slim ? s.length : n);
 
-    static if (algorithm == "gesvd")
+    if (m == 0 || n == 0)
     {
-        auto jobu = slim ? 'S' : 'A';
-        auto jobvt = slim ? 'S' : 'A';
-        auto work = gesvd_wq(jobu, jobvt, a, u.canonical, vt.canonical).uninitSlice!T;
-        auto info = gesvd(jobu, jobvt, a, s, u.canonical, vt.canonical, work);
-        enum msg = "svd: DBDSQR did not converge";
+        u[] = 0;
+        u.diagonal[] = 1;
+        vt[] = 0;
+        vt.diagonal[] = 1;
     }
-    else // gesdd
+    else
     {
-        auto iwork = uninitSlice!lapackint(s.length * 8);
-        auto jobz = slim ? 'S' : 'A';
-        auto work = gesdd_wq(jobz, a, u.canonical, vt.canonical).uninitSlice!T;
-        auto info = gesdd(jobz, a, s, u.canonical, vt.canonical, work, iwork);
-        enum msg = "svd: DBDSDC did not converge, updating process failed";
+        static if (algorithm == "gesvd")
+        {
+            auto jobu = slim ? 'S' : 'A';
+            auto jobvt = slim ? 'S' : 'A';
+            auto work = gesvd_wq(jobu, jobvt, a, u.canonical, vt.canonical).uninitSlice!T;
+            auto info = gesvd(jobu, jobvt, a, s, u.canonical, vt.canonical, work);
+            enum msg = "svd: DBDSQR did not converge";
+        }
+        else // gesdd
+        {
+            auto iwork = uninitSlice!lapackint(s.length * 8);
+            auto jobz = slim ? 'S' : 'A';
+            auto work = gesdd_wq(jobz, a, u.canonical, vt.canonical).uninitSlice!T;
+            auto info = gesdd(jobz, a, s, u.canonical, vt.canonical, work, iwork);
+            enum msg = "svd: DBDSDC did not converge, updating process failed";
+        }
+        import std.exception: enforce;
+        enforce(info == 0, msg);
     }
-
-    import std.exception: enforce;
-    enforce(info == 0, msg);
     return SvdResult!T(vt, s, u); //transposed
 }
 
@@ -460,6 +469,32 @@ unittest
     auto r = a.svd(Yes.slim);
     assert(r.u.shape == [6, 4]);
     assert(r.vt.shape == [4, 4]);
+}
+
+unittest
+{
+    import mir.algorithm.iteration: all;
+
+    // empty matrix as input means that u or vt is identity matrix
+    auto identity = slice!double([4, 4], 0);
+    identity.diagonal[] = 1;
+
+    auto a = slice!double(0, 4);
+    auto res = a.svd;
+
+    import mir.conv: to;
+
+    assert(res.u.shape == [0, 0]);
+    assert(res.vt.shape == [4, 4]);
+    assert(res.vt.all!approxEqual(identity), res.vt.to!string);
+
+    auto b = slice!double(4, 0);
+    res = b.svd;
+
+    assert(res.u.shape == [4, 4]);
+    assert(res.vt.shape == [0, 0]);
+
+    assert(res.u.all!approxEqual(identity), res.u.to!string);
 }
 
 /++

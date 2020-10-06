@@ -27,4 +27,5 @@ lubeck-test-unittest
 *.dll
 *.exe
 build
+builddir
 subprojects/*/
