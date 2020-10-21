@@ -337,11 +337,12 @@ unittest
 unittest
 {
     import mir.algorithm.iteration: all;
+    import std.math: signbit;
 
     auto identity = slice!double([4, 4], 0);
-	identity.diagonal[] = 1;
+    identity.diagonal[] = 1;
 
-    assert(identity.inv.all!"a > 0");
+    assert(identity.inv.all!(i => i.signbit == 0));
 }
 
 ///
