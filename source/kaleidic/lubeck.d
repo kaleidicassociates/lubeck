@@ -1901,9 +1901,12 @@ in
 }
 body
 {
+    import mir.exception: MirException;
+
     alias T = BlasType!Iterator;
     auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
-    potrf!T(uplo, m);
+    if (auto info = potrf!T(uplo, m))
+        throw new MirException("Leading minor of order ", info, " is not positive definite, and the factorization could not be completed.");
     return choleskyResult!T(uplo, m);
 }
 
