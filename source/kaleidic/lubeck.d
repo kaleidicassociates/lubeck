@@ -1859,12 +1859,12 @@ struct choleskyResult(T)
     +/
     char uplo;
     /++
-    if uplo = Lower, the leading 'N x N' lower triangular part of A
+    if uplo = 'L', the leading 'N x N' lower triangular part of A
     contains the lower triangular part of the matrix A, and the
-    strictly upper triangular part if A is not referenced.
-    if uplo = Upper, the leading 'N x N' upper triangular part of A
+    strictly upper triangular part of A is zeroed.
+    if uplo = 'U', the leading 'N x N' upper triangular part of A
     contains the upper triangular part of the matrix A, and the
-    strictly lower triangular part if A is not referenced.
+    strictly lower triangular part of A is zeroed.
     +/
     Slice!(T*, 2, Canonical) matrix;
     /++
@@ -1882,8 +1882,8 @@ struct choleskyResult(T)
 /++
 Computs Cholesky decomposition of symmetric positive definite matrix 'A'.
 The factorization has the form:
-    \A = U**T * U, if UPLO = Upper, or
-    \A = L * L**T, if UPLO = Lower
+    \A = U**T * U, if UPLO = 'U', or
+    \A = L * L**T, if UPLO = 'L'
 Where U is an upper triangular matrix and L is lower triangular.
 Params:
     allowDestroy = flag to delete the source matrix.
@@ -1897,17 +1897,49 @@ auto choleskyDecomp( Flag!"allowDestroy" allowDestroy = No.allowDestroy, Iterato
     Slice!(Iterator, 2, kind) a)
 in
 {
+    assert(uplo == 'L' || uplo == 'U');
     assert(a.length!0 == a.length!1, "matrix must be squared");
 }
 body
 {
     import mir.exception: MirException;
-
     alias T = BlasType!Iterator;
-    auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
-    if (auto info = potrf!T(uplo, m))
+    static if(is(Iterator == T*))
+        auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
+    else
+        auto m = a.as!T.slice.canonical;
+    if (auto info = potrf!T(uplo == 'U' ? 'L' : 'U', m))
         throw new MirException("Leading minor of order ", info, " is not positive definite, and the factorization could not be completed.");
+    import mir.algorithm.iteration: eachUploPair;
+    auto d = m.universal;
+    if (uplo == 'U')
+        d = d.transposed;
+    d.eachUploPair!("a = 0");
     return choleskyResult!T(uplo, m);
+}
+
+///
+unittest
+{
+    import mir.algorithm.iteration: equal, eachUploPair;
+    import mir.ndslice;
+    import mir.random.algorithm;
+    import mir.random.variable;
+    import std.math: approxEqual;
+
+    auto A =
+           [ 25, double.nan, double.nan,
+             15, 18,  double.nan,
+             -5,  0, 11 ]
+             .sliced(3, 3);
+    
+    auto B = randomSlice(uniformVar(-100, 100), 3, 100);
+
+    auto C = choleskyDecomp('L', A);
+    auto X = C.solve(B);
+
+    A.eachUploPair!"a = b";
+    assert(equal!approxEqual(mtimes(A, X), B));
 }
 
 /++
@@ -1934,11 +1966,13 @@ auto choleskySolve(Flag!"allowDestroy" allowDestroy = No.allowDestroy, SliceKind
     Slice!(IteratorB, N, kindB) b)
 in
 {
+    assert(uplo == 'L' || uplo == 'U');
     assert(c.length!0 == c.length!1, "matrix must be squared");
     assert(c.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
 body
 {
+    uplo = uplo == 'U' ? 'L' : 'U';
     alias B = BlasType!IteratorB;
     alias C = BlasType!IteratorC;
     alias T = CommonType!(B, C);
@@ -1962,29 +1996,6 @@ body
 }
 
 ///
-unittest
-{
-    import mir.ndslice;
-
-    auto A =
-           [ 25, 15, -5,
-             15, 18,  0,
-             -5,  0, 11 ]
-             .sliced(3, 3)
-             .as!double.slice;
-    
-    import mir.random.variable;
-    import mir.random.algorithm;
-    auto B = randomSlice(uniformVar(-100, 100), 3, 100);
-
-    auto C = choleskyDecomp('L', A);
-    auto X = C.solve(B);
-
-    import std.math: approxEqual;
-    import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, X), B));
-}
-
 unittest
 {
     auto A =
