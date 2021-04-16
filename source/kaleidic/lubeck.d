@@ -329,7 +329,7 @@ unittest
         .sliced(a.shape);
 
     import mir.algorithm.iteration: equal;
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.inv, ans));
     assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.as!cdouble.inv.as!double, ans));
 }
@@ -447,7 +447,7 @@ unittest
     auto m = r.u.mtimes(sigma).mtimes(r.vt);
 
     import mir.algorithm.iteration: equal;
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     assert(equal!((a, b) => a.approxEqual(b, 1e-8, 1e-8))(a, m));
 }
 
@@ -670,16 +670,10 @@ unittest
             -1.5241,
             0.0392].sliced.map!transform;
 
-        import std.math: approxEqual;
-        static if(is(C == cdouble))
-        {
-            assert(a.mldivide(b).map!"a.re".approxEqual(x.map!"a.re"));
-            assert(a.mldivide(b).map!"a.im".approxEqual(x.map!"a.im"));
-        }
-        else
-        {
-            assert(a.mldivide(b).approxEqual(x));
-        }
+        import mir.math.common: approxEqual;
+        import mir.algorithm.iteration: all;
+        alias appr = all!((a, b) => approxEqual(a, b, 1e-3, 1e-3));
+        assert(appr(a.mldivide(b), x));
     }
 }
 
@@ -755,7 +749,7 @@ unittest
 {
     import mir.ndslice;
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
 
     auto ingedients = [
@@ -863,11 +857,12 @@ unittest
        -0.0055,  0.0064,  0.0060, -0.0043, -0.0040,  0.0049,  0.0045, -0.0028,
        -0.0020,  0.0039,  0.0046, -0.0038, -0.0044,  0.0064,  0.0070, -0.0063,
        -0.0086,  0.0108,  0.0115, -0.0109, -0.0117,  0.0139,  0.0147, -0.0141,
-        0.0142, -0.0140, -0.0149,  0.0169,  0.0178, -0.0176, -0.0185,  0.0205];
+        0.0142, -0.0140, -0.0149,  0.0169,  0.0178, -0.0176, -0.0185,  0.0205].sliced(6, 8);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
+    import mir.algorithm.iteration: all;
 
-    assert(b.field.approxEqual(result, 1e-2, 1e-2));
+    assert(b.all!((a, b) => approxEqual(a, b, 1e-2, 1e-2))(result));
 }
 
 /++
@@ -919,8 +914,7 @@ unittest
 
     auto c = 8.magic[0..$-1].cov;
 
-    import std.math: approxEqual;
-    assert(c.field.approxEqual([
+    auto result = [
          350.0000, -340.6667, -331.3333,  322.0000,  312.6667, -303.3333, -294.0000,  284.6667,
         -340.6667,  332.4762,  324.2857, -316.0952, -307.9048,  299.7143,  291.5238, -283.3333,
         -331.3333,  324.2857,  317.2381, -310.1905, -303.1429,  296.0952,  289.0476, -282.0000,
@@ -928,7 +922,10 @@ unittest
          312.6667, -307.9048, -303.1429,  298.3810,  293.6190, -288.8571, -284.0952,  279.3333,
         -303.3333,  299.7143,  296.0952, -292.4762, -288.8571,  285.2381,  281.6190, -278.0000,
         -294.0000,  291.5238,  289.0476, -286.5714, -284.0952,  281.6190,  279.1429, -276.6667,
-         284.6667, -283.3333, -282.0000,  280.6667,  279.3333, -278.0000, -276.6667,  275.3333]));
+         284.6667, -283.3333, -282.0000,  280.6667,  279.3333, -278.0000, -276.6667,  275.3333].sliced(8, 8);
+    import mir.math.common: approxEqual;
+    import mir.algorithm.iteration: all;
+    assert(c.all!((a, b) => approxEqual(a, b, 1e-5, 1e-5))(result));
 }
 
 /++
@@ -1079,7 +1076,7 @@ unittest
         d[k,l] = 0.5 * (k == l ? (k + 1) * (k + 1) + 1 : 2 * (k + 1) * (l + 1));
 
     auto dd = det(d);
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     assert (approxEqual(dd, 3.539152633479803e289, double.epsilon.sqrt));
 
     // Symmetric packed matrix
@@ -1175,7 +1172,8 @@ unittest
     import mir.ndslice.slice: sliced;
     import mir.ndslice.topology: universal, map;
     import mir.ndslice.dynamic: transposed;
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
+    import mir.algorithm.iteration: all;
 
     auto a = [
         1.0000, 0.5000, 0.3333, 0.2500,
@@ -1185,20 +1183,19 @@ unittest
 
     auto eigr = eigSymmetric('L', a);
 
-    assert(eigr.values.approxEqual([0.2078,0.4078,0.8482,2.5362]));
+    alias appr = all!((a, b) => approxEqual(a, b, 1e-3, 1e-3));
+
+    assert(appr(eigr.values, [0.2078,0.4078,0.8482,2.5362]));
 
     auto test = [
          0.0693, -0.4422, -0.8105, 0.3778,
         -0.3618,  0.7420, -0.1877, 0.5322,
          0.7694,  0.0486,  0.3010, 0.5614,
-        -0.5219, -0.5014,  0.4662, 0.5088]
-            .sliced(4, 4)
-            .universal
-            .transposed;
+        -0.5219, -0.5014,  0.4662, 0.5088].sliced(4, 4).transposed;
+
 
     foreach (i; 0 .. 4)
-        assert(eigr.vectors[i].approxEqual(test[i]) ||
-            eigr.vectors[i].map!"-a".approxEqual(test[i]));
+        assert(appr(eigr.vectors[i], test[i]) || appr(eigr.vectors[i].map!"-a", test[i]));
 }
 
 version (unittest)
@@ -1443,9 +1440,10 @@ unittest
     auto LU = A.luDecomp();
     auto m = luSolve('N', LU.lut, LU.ipiv, B_);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, m), B_));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, m), B_));
 }
 
 ///
@@ -1501,9 +1499,10 @@ unittest
     auto m = luSolve!(Yes.allowDestroy)('N', LU.lut, LU.ipiv, B.transposed);
     auto m2 = LU.solve('N', C);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, m), C.transposed));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, m), C.transposed));
     assert(equal!approxEqual(mtimes(A, m2), C));
 }
 
@@ -1524,9 +1523,10 @@ unittest
     auto LU = A.luDecomp();
     auto m = luSolve!(Yes.allowDestroy)('N', LU.lut, LU.ipiv, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, m), C));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, m), C));
 }
 
 unittest
@@ -1546,9 +1546,10 @@ unittest
     auto LU = A.luDecomp();
     auto m = luSolve('N', LU.lut, LU.ipiv, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, m), B));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, m), B));
 }
 
 unittest
@@ -1577,10 +1578,12 @@ unittest
     auto m = luSolve!(Yes.allowDestroy)('T', LU.lut, LU.ipiv, B);
     auto m2 = luSolve!(Yes.allowDestroy)('N', LU.lut, LU.ipiv, B2);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, m), C));
-    assert(equal!approxEqual(mtimes(A.transposed, m2), C));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+
+    assert(appr(mtimes(A, m), C));
+    assert(appr(mtimes(A.transposed, m2), C));
 }
 
 unittest
@@ -1607,9 +1610,10 @@ unittest
     auto LU = A.luDecomp();
     auto m = luSolve('N', LU.lut, LU.ipiv, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, m), B));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, m), B));
 }
 
 unittest
@@ -1629,7 +1633,7 @@ unittest
     moveRows(res, LU.ipiv);
 
     import mir.algorithm.iteration: equal;
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     assert(res.equal!approxEqual(B));
 }
 
@@ -1652,7 +1656,7 @@ unittest
     moveRows(res, LU.ipiv);
 
     import mir.algorithm.iteration: equal;
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     assert(res.equal!approxEqual(C));
 }
 
@@ -1798,9 +1802,10 @@ unittest
     auto LDL = ldlDecomp('L', A);
     auto X = LDL.solve(B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, X), B));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, X), B));
 }
 
 unittest
@@ -1826,9 +1831,10 @@ unittest
     auto LDL = ldlDecomp!(Yes.allowDestroy)('L', A);
     auto X = ldlSolve!(Yes.allowDestroy)(LDL.uplo, A, LDL.ipiv, B.transposed);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A_, X), B_.transposed));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A_, X), B_.transposed));
 }
 
 unittest
@@ -1846,9 +1852,10 @@ unittest
     auto LDL = ldlDecomp('L', A);
     auto X = LDL.solve(B);
     
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, X), B_));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, X), B_));
 }
 
 struct choleskyResult(T)
@@ -1925,7 +1932,7 @@ unittest
     import mir.ndslice;
     import mir.random.algorithm;
     import mir.random.variable;
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
 
     auto A =
            [ 25, double.nan, double.nan,
@@ -1998,47 +2005,46 @@ body
 ///
 unittest
 {
+    import mir.ndslice.slice: sliced;
+    import mir.ndslice.topology: as;
+    import std.typecons: Flag, Yes;
+
     auto A =
-            [ 1,  1,  3,
-              1,  5,  5,
-              3,  5, 19 ]
-             .sliced(3, 3)
-             .as!double.slice
-             .universal;
-    auto B = [ 10,  157,  80 ].sliced(3).as!float.slice;
-    auto C_ = B.slice.sliced(3, 1);
+            [ 1.0,  1,  3,
+              1  ,  5,  5,
+              3  ,  5, 19 ].sliced(3, 3);
+
+    auto B = [ 10.0,  157,  80 ].sliced;
+    auto C_ = B.dup.sliced(3, 1);
 
     auto C = choleskyDecomp('U', A);
     auto X = choleskySolve!(Yes.allowDestroy)(C.uplo, C.matrix, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, X), C_));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, X), C_));
 }
 
 unittest
 {
     auto A =
-            [ 6,  15,  55,
+            [6.0f,  15,  55,
              15,  55, 225,
-             55, 225, 979 ]
-             .sliced(3, 3)
-             .as!float.slice
-             .canonical;
+             55, 225, 979 ].sliced(3, 3).canonical;
     auto B =
-            [ 7,  3,
+            [ 7.0,  3,
               2,  1,
-              1,  8 ]
-              .sliced(3, 2)
-              .as!double.slice
-              .universal;
+              1,  8 ].sliced(3, 2).universal;
 
     auto C = choleskyDecomp('L', A);
     auto X = choleskySolve(C.uplo, C.matrix, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, X), B));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+
+    assert(appr(mtimes(A, X), B));
 }
 
 
@@ -2152,7 +2158,7 @@ unittest
     auto val_matrix = val.matrix.slice;
     auto val_tau = val.tau.slice;
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.ndslice : equal;
     
     auto r = val.R;
@@ -2196,9 +2202,10 @@ unittest
     auto r = C.R;
     auto A_reconstructed = C.reconstruct(q, r);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(q, Q_check));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(q, Q_check));
     assert(equal!approxEqual(r, R_check));
     assert(equal!approxEqual(A_reconstructed, A));
 }
@@ -2305,9 +2312,10 @@ unittest
     auto C = qrDecomp(A);
     auto X = C.solve(B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, X), B));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, X), B));
 }
 
 unittest
@@ -2324,9 +2332,10 @@ unittest
     auto C = qrDecomp(A);
     auto X = qrSolve(C.matrix, C.tau, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(mtimes(A, X), B_));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(mtimes(A, X), B_));
 }
 
 unittest
@@ -2347,7 +2356,7 @@ unittest
     auto C = qrDecomp(A);
     auto X = qrSolve(C.matrix, C.tau, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
     
     assert(equal!approxEqual(mtimes(A, X), B));
@@ -2396,7 +2405,8 @@ unittest
     auto C = qrDecomp(A);
     auto X = qrSolve(C.matrix, C.tau, B);
 
-    import std.math: approxEqual;
+    import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    assert(equal!approxEqual(X, X_check));
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    assert(appr(X, X_check));
 }
