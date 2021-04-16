@@ -1,6 +1,6 @@
 dist: focal
 python:
-  - "3.6"  
+  - "3.7"  
 sudo: false
 
 language: d
@@ -19,6 +19,8 @@ addons:
     packages:
       - liblapack-dev libblas-dev
       - pkg-config
+      - python3
+      - python3-pip
 
 install:
   - pip3 install 'meson>=0.48.2'
