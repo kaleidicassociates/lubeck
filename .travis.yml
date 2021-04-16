@@ -1,6 +1,4 @@
 dist: focal
-python:
-  - "3.7"  
 sudo: false
 
 language: d
@@ -12,20 +10,8 @@ d:
 script:
   - dub test -c unittest-blas
   - dub run -c blas --root example
-  - meson build -D with_test=true --unity=on --default-library=static && cd build && ninja -j4 && ninja test -v && cd ..
 
 addons:
   apt:
     packages:
       - liblapack-dev libblas-dev
-      - pkg-config
-      - python3
-      - python3-pip
-
-install:
-  - pip3 install setuptools 'meson>=0.48.2'
-  - mkdir .ntmp
-  - curl -L https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip -o .ntmp/ninja-linux.zip
-  - unzip .ntmp/ninja-linux.zip -d .ntmp
-before_script:
-  - export PATH=$PATH:$PWD/.ntmp
