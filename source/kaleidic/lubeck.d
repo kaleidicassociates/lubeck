@@ -2015,7 +2015,7 @@ unittest
               3  ,  5, 19 ].sliced(3, 3);
 
     auto B = [ 10.0,  157,  80 ].sliced;
-    auto C_ = B.slice.sliced(3, 1);
+    auto C_ = B.dup.sliced(3, 1);
 
     auto C = choleskyDecomp('U', A);
     auto X = choleskySolve!(Yes.allowDestroy)(C.uplo, C.matrix, B);
@@ -2029,19 +2029,13 @@ unittest
 unittest
 {
     auto A =
-            [ 6,  15,  55,
+            [6.0f,  15,  55,
              15,  55, 225,
-             55, 225, 979 ]
-             .sliced(3, 3)
-             .as!float.slice
-             .canonical;
+             55, 225, 979 ].sliced(3, 3).canonical;
     auto B =
-            [ 7,  3,
+            [ 7.0,  3,
               2,  1,
-              1,  8 ]
-              .sliced(3, 2)
-              .as!double.slice
-              .universal;
+              1,  8 ].sliced(3, 2).universal;
 
     auto C = choleskyDecomp('L', A);
     auto X = choleskySolve(C.uplo, C.matrix, B);
