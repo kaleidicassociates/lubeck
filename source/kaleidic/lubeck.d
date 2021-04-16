@@ -2007,14 +2007,13 @@ unittest
 {
     import mir.ndslice.slice: sliced;
     import mir.ndslice.topology: as;
+    import std.typecons: Flag, Yes;
 
     auto A =
-            [ 1,  1,  3,
-              1,  5,  5,
-              3,  5, 19 ]
-             .sliced(3, 3)
-             .as!double.slice
-             .universal;
+            [ 1.0,  1,  3,
+              1  ,  5,  5,
+              3  ,  5, 19 ].sliced(3, 3);
+
     auto B = [ 10.0,  157,  80 ].sliced;
     auto C_ = B.slice.sliced(3, 1);
 
