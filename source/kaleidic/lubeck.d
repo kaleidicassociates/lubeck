@@ -1998,6 +1998,8 @@ body
 ///
 unittest
 {
+    import mir.ndslice.slice: sliced;
+
     auto A =
             [ 1,  1,  3,
               1,  5,  5,
