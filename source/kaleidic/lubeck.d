@@ -334,6 +334,17 @@ unittest
     assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.as!cdouble.inv.as!double, ans));
 }
 
+unittest
+{
+    import mir.algorithm.iteration: all;
+    import std.math: signbit;
+
+    auto identity = slice!double([4, 4], 0);
+    identity.diagonal[] = 1;
+
+    assert(identity.inv.all!(i => i.signbit == 0));
+}
+
 ///
 unittest
 {
