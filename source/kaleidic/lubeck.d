@@ -292,7 +292,7 @@ in
 {
     assert (a.length!0 == a.length!1, "matrix must be square");
 }
-body
+do
 {
     alias T = BlasType!Iterator;
 
@@ -701,7 +701,7 @@ in
 {
     assert(matrix.length!0 >= matrix.length!1);
 }
-body
+do
 {
     import mir.math.sum: sum;
     import mir.algorithm.iteration: maxIndex, eachUploPair;
@@ -938,7 +938,7 @@ in
     assert (a.length!0 == a.length!1, "matrix must be square");
     assert (a.length!0, "matrix must not be empty");
 }
-body
+do
 {
     import mir.algorithm.iteration: each;
     import mir.ndslice.topology: diagonal;
@@ -1017,7 +1017,7 @@ in
 {
     assert (a.length!0 == a.length!1, "matrix must be square");
 }
-body
+do
 {
     import mir.ndslice.topology: diagonal, zip, iota;
     import mir.math.numeric: ProdAccumulator;
@@ -1114,7 +1114,7 @@ in
     assert (a.length!0 == a.length!1, "matrix must be square");
     assert (a.length!0, "matrix must not be empty");
 }
-body
+do
 {
     import mir.algorithm.iteration: each;
     import mir.ndslice.topology: diagonal;
@@ -1391,7 +1391,7 @@ in
     assert(ipiv.length == lut.length, "size of ipiv must be equal to the number of rows a");
     assert(lut.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
-body
+do
 {
     alias LU = BlasType!IteratorLU;
     alias B = BlasType!IteratorB;
@@ -1716,7 +1716,7 @@ in
 {
     assert(a.length!0 == a.length!1, "matrix must be squared");
 }
-body
+do
 {
     alias T = BlasType!Iterator;
     auto work = [T.sizeof * a.length].uninitSlice!T;
@@ -1756,7 +1756,7 @@ in
     assert(ipiv.length == a.length, "size of ipiv must be equal to the number of rows a");
     assert(a.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
-body
+do
 {
     alias A = BlasType!IteratorA;
     alias B = BlasType!IteratorB;
@@ -1907,7 +1907,7 @@ in
     assert(uplo == 'L' || uplo == 'U');
     assert(a.length!0 == a.length!1, "matrix must be squared");
 }
-body
+do
 {
     import mir.exception: MirException;
     alias T = BlasType!Iterator;
@@ -1977,7 +1977,7 @@ in
     assert(c.length!0 == c.length!1, "matrix must be squared");
     assert(c.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
-body
+do
 {
     uplo = uplo == 'U' ? 'L' : 'U';
     alias B = BlasType!IteratorB;
@@ -2253,7 +2253,7 @@ in
 {
     assert(a.length!1 == b.length!0, "number of columns a should be equal to the number of rows b");
 }
-body
+do
 {
     alias A = BlasType!IteratorA;
     alias B = BlasType!IteratorB;
