@@ -5,6 +5,7 @@ copyright "Copyright © 2017-2020, Symmetry Investments & Kaleidic Associates; C
 license "BSL-1.0"
 
 dependency "mir-lapack" version="~>1.2.1"
+versions "CBLAS_STD_COMPLEX" "LAPACK_STD_COMPLEX"
 
 configuration "library" {
 	targetType "library"

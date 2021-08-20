@@ -28,6 +28,11 @@ foreach s : sources_list
     sources += 'source/' + s + '.d'
 endforeach
 
+add_global_arguments([
+    '--d-version=CBLAS_STD_COMPLEX',
+    '--d-version=LAPACK_STD_COMPLEX',
+], language: 'd')
+
 add_project_arguments([
     '-preview=dip1008',
     '-lowmem',

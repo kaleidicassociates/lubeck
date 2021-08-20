@@ -14,6 +14,7 @@ import mir.rc.array;
 import mir.utility: min, max;
 import std.traits: isFloatingPoint, Unqual;
 import std.typecons: Flag, Yes, No;
+import std.complex: Complex;
 
 /++
 Identity matrix.
@@ -182,25 +183,26 @@ unittest
 @safe pure nothrow
 unittest
 {
+    import std.complex;
     import mir.ndslice;
     import mir.math;
 
-    auto a = mininitRcslice!cdouble(3, 5);
-    auto b = mininitRcslice!cdouble(5, 4);
+    auto a = mininitRcslice!(Complex!double)(3, 5);
+    auto b = mininitRcslice!(Complex!double)(5, 4);
 
     a[] =
-    [[-5 + 0i,  1,  7, 7, -4],
-     [-1 + 0i, -5,  6, 3, -3],
-     [-5 + 0i, -2, -3, 6,  0]];
+    [[-5,  1,  7, 7, -4],
+     [-1, -5,  6, 3, -3],
+     [-5, -2, -3, 6,  0]];
 
     b[] =
-    [[-5 + 0i, -3,  3,  1],
-     [ 4 + 0i,  3,  6,  4],
-     [-4 + 0i, -2, -2,  2],
-     [-1 + 0i,  9,  4,  8],
-     [ 9 + 0i, 8,  3, -2]];
+    [[-5, -3,  3,  1],
+     [ 4,  3,  6,  4],
+     [-4, -2, -2,  2],
+     [-1,  9,  4,  8],
+     [ 9, 8,  3, -2]];
 
-    assert(mtimes!(cdouble, cdouble)(a, b) ==
+    assert(mtimes!((Complex!double), (Complex!double))(a, b) ==
         [[-42,  35,  -7, 77],
          [-69, -21, -42, 21],
          [ 23,  69,   3, 29]]);
@@ -321,15 +323,16 @@ Slice!(RCI!T, 1) mldivide (T, SliceKind kindA, SliceKind kindB)(
 
 pure unittest
 {
+    import std.complex;
     auto a = mininitRcslice!double(2, 2);
     a[] = [[2,3],
            [1, 4]];
     auto res = mldivide(eye(2), a);
     assert(equal!approxEqual(res, a));
-    auto b = mininitRcslice!cdouble(2, 2);
-    b[] = [[2+1i,3+2i],
-           [1+3i, 4+4i]];
-    auto cres = mldivide(eye!cdouble(2), b);
+    auto b = mininitRcslice!(Complex!double)(2, 2);
+    b[] = [[Complex!double(2, 1),Complex!double(3, 2)],
+           [Complex!double(1, 3), Complex!double(4, 4)]];
+    auto cres = mldivide(eye!(Complex!double)(2), b);
     assert(cres == b);
     auto c = mininitRcslice!double(2, 2);
     c[] = [[5,3],
@@ -346,6 +349,7 @@ pure unittest
 
 pure unittest
 {
+    import std.complex;
     import mir.ndslice;
     import mir.math;
 
@@ -380,32 +384,32 @@ pure unittest
     auto res = mldivide(a, b);
     assert(equal!((a, b) => fabs(a - b) < 5e-5)(res, x));
 
-    auto ca =  mininitRcslice!cdouble(6, 4);
+    auto ca =  mininitRcslice!(Complex!double)(6, 4);
     ca[] = [
-        -0.57 + 0.0i,  -1.28 + 0.0i,  -0.39 + 0.0i,   0.25 + 0.0i,
-        -1.93 + 0.0i,   1.08 + 0.0i,  -0.31 + 0.0i,  -2.14 + 0.0i,
-        2.30 + 0.0i,   0.24 + 0.0i,   0.40 + 0.0i,  -0.35 + 0.0i,
-        -1.93 + 0.0i,   0.64 + 0.0i,  -0.66 + 0.0i,   0.08 + 0.0i,
-        0.15 + 0.0i,   0.30 + 0.0i,   0.15 + 0.0i,  -2.13 + 0.0i,
-        -0.02 + 0.0i,   1.03 + 0.0i,  -1.43 + 0.0i,   0.50 + 0.0i,
+        -0.57,  -1.28,  -0.39,   0.25,
+        -1.93,   1.08,  -0.31,  -2.14,
+        2.30,   0.24,   0.40,  -0.35,
+        -1.93,   0.64,  -0.66,   0.08,
+        0.15,   0.30,   0.15,  -2.13,
+        -0.02,   1.03,  -1.43,   0.50,
     ].sliced(6, 4);
 
-    auto cb = mininitRcslice!cdouble(6,1);
+    auto cb = mininitRcslice!(Complex!double)(6,1);
     cb[] = [
-        -2.67 + 0.0i,
-        -0.55 + 0.0i,
-        3.34 + 0.0i,
-        -0.77 + 0.0i,
-        0.48 + 0.0i,
-        4.10 + 0.0i,
+        -2.67,
+        -0.55,
+        3.34,
+        -0.77,
+        0.48,
+        4.10,
     ].sliced(6,1);
 
-    auto cx = mininitRcslice!cdouble(4,1);
+    auto cx = mininitRcslice!(Complex!double)(4,1);
     cx[] = [
-        1.5339 + 0.0i,
-        1.8707 + 0.0i,
-        -1.5241 + 0.0i,
-        0.0392 + 0.0i
+        1.5339,
+        1.8707,
+        -1.5241,
+        0.0392
     ].sliced(4,1);
 
     auto cres = mldivide(ca, cb);
@@ -782,13 +786,13 @@ EigenResult!(realType!T) eigen(T, SliceKind kind)(
         work[n .. n * 2] = wi;
         foreach (i, ref e; w.field)
         {
-            e = work[i] + work[n + i] * 1fi;
+            e = C(work[i], work[n + i]);
             auto zi = z.lightScope[i];
             if (e.im > 0)
-                zi[] = zip(zr[i], zr[i + 1]).map!"a + b * 1fi";
+                zi[] = zip(zr[i], zr[i + 1]).map!((a, b) => C(a, b));
             else
             if (e.im < 0)
-                zi[] = zip(zr[i - 1], zr[i]).map!"a - b * 1fi";
+                zi[] = zip(zr[i - 1], zr[i]).map!((a, b) => C(a, -b));
             else
                 zi[] = zr[i].as!C;
         }
@@ -809,16 +813,18 @@ EigenResult!(realType!T) eigen(T, SliceKind kind)(
 // pure
 unittest
 {
+    import mir.blas;
+    import std.complex;
     import mir.ndslice;
     import mir.math;
 
     auto data = 
         [[ 0, 1],
          [-1, 0]].fuse.as!double.rcslice;
-    auto eigenvalues = [0 + 1i, 0 - 1i].sliced;
+    auto eigenvalues = [Complex!double(0, 1), Complex!double(0, -1)].sliced;
     auto eigenvectors =
-        [[0 - 1i, 1 + 0i],
-         [0 + 1i, 1 + 0i]].fuse;
+        [[Complex!double(0, -1), Complex!double(1, 0)],
+         [Complex!double(0, 1), Complex!double(1, 0)]].fuse;
 
     auto res = data.eigen;
 
@@ -832,6 +838,7 @@ unittest
 @safe pure
 unittest
 {
+    import std.complex;
     import mir.ndslice;
     import mir.math;
     import mir.blas;
@@ -841,12 +848,12 @@ unittest
          [0, 0, 1],
          [1, 0, 0]].fuse.as!double.rcslice;
     auto c = 3.0.sqrt;
-    auto eigenvalues = [(-1 + c * 1i) / 2, (-1 - c * 1i) / 2, 1 + 0i];
+    auto eigenvalues = [Complex!double(-1, c) / 2, Complex!double(-1, - c) / 2, Complex!double(1, 0)];
 
     auto eigenvectors =
-        [[-1 + c * 1i , -1 - c * 1i , 2 + 0i],
-         [-1 - c * 1i , -1 + c * 1i , 2 + 0i],
-         [1 + 0i, 1 + 0i, 1 + 0i]].fuse;
+        [[Complex!double(-1, +c), Complex!double(-1, -c) , Complex!double(2, 0)],
+         [Complex!double(-1, -c), Complex!double(-1, +c) , Complex!double(2, 0)],
+         [Complex!double(1, 0), Complex!double(1, 0), Complex!double(1, 0)]].fuse;
 
     auto res = data.eigen;
 
@@ -854,7 +861,7 @@ unittest
     foreach (i; 0 .. eigenvectors.length)
         assert((res.eigenvectors.lightScope[i] / eigenvectors[i]).diff.slice.nrm2.approxEqual(0));
 
-    auto cdata = data.lightScope.as!cdouble.rcslice;
+    auto cdata = data.lightScope.as!(Complex!double).rcslice;
     res = cdata.eigen;
 
     assert(res.eigenvalues.equal!approxEqual(eigenvalues));
@@ -1243,14 +1250,11 @@ private T conj(T)(
 
 private template complexType(C)
 {
+    import std.complex: Complex;
     static if (isComplex!C)
         alias complexType = Unqual!C;
     else static if (is(Unqual!C == double))
-        alias complexType = cdouble;
-    else static if (is (Unqual!C == float))
-        alias complexType = cfloat;
-    else static if (is (Unqual!C == real))
-        alias complexType = creal;
+        alias complexType = Complex!(Unqual!C);
 }
 
 ///
