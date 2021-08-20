@@ -19,7 +19,7 @@ import mir.utility;
 import std.meta;
 import std.traits;
 import std.typecons: Flag, Yes, No;
-import std.complex: Complex;
+import mir.complex: Complex;
 public import mir.lapack: lapackint;
 
 template CommonType(A)
@@ -327,7 +327,7 @@ do
 ///
 unittest
 {
-    import std.complex;
+    import mir.complex;
     import mir.ndslice;
 
     auto a =  [
@@ -589,7 +589,7 @@ Slice!(BlasType!(IteratorA, IteratorB)*)
 /// AX=B
 unittest
 {
-    import std.complex;
+    import mir.complex;
     import std.meta: AliasSeq;
     import mir.ndslice;
 
@@ -621,7 +621,7 @@ unittest
 /// Ax=B
 unittest
 {
-    import std.complex;
+    import mir.complex;
     import std.meta: AliasSeq;
     import mir.ndslice;
 
@@ -653,7 +653,7 @@ unittest
 /// Least-Squares Solution of Underdetermined System
 unittest
 {
-    import std.complex;
+    import mir.complex;
     import std.meta: AliasSeq;
     import mir.ndslice;
 
@@ -2382,7 +2382,7 @@ unittest
 
 unittest
 {
-    import std.complex;
+    import mir.complex;
     auto A =
             [ 1,  1,  0,
               1,  0,  1,

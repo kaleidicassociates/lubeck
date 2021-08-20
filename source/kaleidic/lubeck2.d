@@ -14,7 +14,7 @@ import mir.rc.array;
 import mir.utility: min, max;
 import std.traits: isFloatingPoint, Unqual;
 import std.typecons: Flag, Yes, No;
-import std.complex: Complex;
+import mir.complex: Complex;
 
 /++
 Identity matrix.
@@ -183,7 +183,7 @@ unittest
 @safe pure nothrow
 unittest
 {
-    import std.complex;
+    import mir.complex;
     import mir.ndslice;
     import mir.math;
 
@@ -323,7 +323,7 @@ Slice!(RCI!T, 1) mldivide (T, SliceKind kindA, SliceKind kindB)(
 
 pure unittest
 {
-    import std.complex;
+    import mir.complex;
     auto a = mininitRcslice!double(2, 2);
     a[] = [[2,3],
            [1, 4]];
@@ -349,7 +349,7 @@ pure unittest
 
 pure unittest
 {
-    import std.complex;
+    import mir.complex;
     import mir.ndslice;
     import mir.math;
 
@@ -814,7 +814,7 @@ EigenResult!(realType!T) eigen(T, SliceKind kind)(
 unittest
 {
     import mir.blas;
-    import std.complex;
+    import mir.complex;
     import mir.ndslice;
     import mir.math;
 
@@ -838,7 +838,7 @@ unittest
 @safe pure
 unittest
 {
-    import std.complex;
+    import mir.complex;
     import mir.ndslice;
     import mir.math;
     import mir.blas;
@@ -1250,7 +1250,7 @@ private T conj(T)(
 
 private template complexType(C)
 {
-    import std.complex: Complex;
+    import mir.complex: Complex;
     static if (isComplex!C)
         alias complexType = Unqual!C;
     else static if (is(Unqual!C == double))
