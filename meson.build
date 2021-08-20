@@ -53,6 +53,7 @@ this_lib = library(meson.project_name(),
     install: true,
     version: meson.project_version(),
     dependencies: required_deps,
+    d_module_versions: ['CBLAS_STD_COMPLEX', 'LAPACK_STD_COMPLEX'],
 )
 
 this_dep = declare_dependency(

@@ -19,7 +19,21 @@ import mir.utility;
 import std.meta;
 import std.traits;
 import std.typecons: Flag, Yes, No;
+import std.complex: Complex;
 public import mir.lapack: lapackint;
+
+template CommonType(A)
+{
+    alias CommonType = A;
+}
+
+template CommonType(A, B)
+{
+    static if (isComplex!A || isComplex!B)
+        alias CommonType = Complex!(CommonType!(realType!A, realType!B));
+    else
+        alias CommonType = typeof(A.init + B.init);
+}
 
 version(LDC)
     import ldc.attributes: fastmath;
@@ -32,15 +46,15 @@ private template IterationType(Iterator)
     static if (isIntegral!T || is(T == real))
         alias IterationType = double;
     else
-    static if (is(T == creal))
-        alias IterationType = cdouble;
+    static if (is(T == Complex!real))
+        alias IterationType = Complex!double;
     else
     {
         static assert(
             is(T == double) ||
             is(T == float) ||
-            is(T == cdouble) ||
-            is(T == cfloat));
+            is(T == Complex!double) ||
+            is(T == Complex!float));
         alias IterationType = T;
     }
 }
@@ -331,7 +345,7 @@ unittest
     import mir.algorithm.iteration: equal;
     import mir.math.common: approxEqual;
     assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.inv, ans));
-    assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.as!cdouble.inv.as!double, ans));
+    assert(equal!((a, b) => a.approxEqual(b, 1e-10L, 1e-10L))(a.map!(a => Complex!double(a, 0)).inv.member!"re", ans));
 }
 
 ///
@@ -577,10 +591,10 @@ unittest
     import std.meta: AliasSeq;
     import mir.ndslice;
 
-    foreach(C; AliasSeq!(double, cdouble))
+    foreach(C; AliasSeq!(double, Complex!double))
     {
-        static if(is(C == cdouble))
-            enum transform = "a+0i";
+        static if(is(C == Complex!double))
+            alias transform = a => C(a, 0);
         else
             enum transform = "a";
 
@@ -608,10 +622,10 @@ unittest
     import std.meta: AliasSeq;
     import mir.ndslice;
 
-    foreach(C; AliasSeq!(double, cdouble))
+    foreach(C; AliasSeq!(double, Complex!double))
     {
-        static if(is(C == cdouble))
-            enum transform = "a+0i";
+        static if(is(C == Complex!double))
+            alias transform = a => C(a, 0);
         else
             enum transform = "a";
 
@@ -639,10 +653,10 @@ unittest
     import std.meta: AliasSeq;
     import mir.ndslice;
 
-    foreach(C; AliasSeq!(double, )) //cdouble fails for DMD>=2085
+    foreach(C; AliasSeq!(double, )) //Complex!double fails for DMD>=2085
     {
-        static if(is(C == cdouble))
-            enum transform = "a+0i";
+        static if(is(C == Complex!double))
+            alias transform = a => C(a, 0);
         else
             enum transform = "a";
 
@@ -2102,7 +2116,7 @@ struct QRResult(T)
         } else {
             r[] = matrix[0..tau.length, 0..tau.length].transposed.slice;
         }
-        r.eachLower!("a = cast(" ~ T.stringof ~ ")0");
+        r.eachLower!((ref a) {a = cast(T)0;});
         return r.universal;
     }
 
@@ -2369,14 +2383,14 @@ unittest
               1,  0,  1,
               0,  1,  1 ]
               .sliced(3, 3)
-              .as!cdouble.slice;
+              .as!(Complex!double).slice;
 
     auto B =
             [ 15,  78,  11,
               21,  47,  71,
               81,  11,  81 ]
               .sliced(3, 3)
-              .as!cfloat.slice;
+              .as!(Complex!float).slice;
     auto C = qrDecomp(A);
     auto X = qrSolve(C.matrix, C.tau, B);
     auto res = mtimes(A, X);
