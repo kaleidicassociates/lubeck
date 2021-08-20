@@ -183,6 +183,7 @@ unittest
 @safe pure nothrow
 unittest
 {
+    import std.complex;
     import mir.ndslice;
     import mir.math;
 
@@ -322,6 +323,7 @@ Slice!(RCI!T, 1) mldivide (T, SliceKind kindA, SliceKind kindB)(
 
 pure unittest
 {
+    import std.complex;
     auto a = mininitRcslice!double(2, 2);
     a[] = [[2,3],
            [1, 4]];
@@ -347,6 +349,7 @@ pure unittest
 
 pure unittest
 {
+    import std.complex;
     import mir.ndslice;
     import mir.math;
 
@@ -810,6 +813,7 @@ EigenResult!(realType!T) eigen(T, SliceKind kind)(
 // pure
 unittest
 {
+    import std.complex;
     import mir.ndslice;
     import mir.math;
 
@@ -833,6 +837,7 @@ unittest
 @safe pure
 unittest
 {
+    import std.complex;
     import mir.ndslice;
     import mir.math;
     import mir.blas;
