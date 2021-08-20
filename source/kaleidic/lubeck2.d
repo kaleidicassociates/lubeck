@@ -813,6 +813,7 @@ EigenResult!(realType!T) eigen(T, SliceKind kind)(
 // pure
 unittest
 {
+    import mir.blas;
     import std.complex;
     import mir.ndslice;
     import mir.math;
