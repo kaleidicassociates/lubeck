@@ -327,6 +327,7 @@ do
 ///
 unittest
 {
+    import std.complex;
     import mir.ndslice;
 
     auto a =  [
@@ -588,6 +589,7 @@ Slice!(BlasType!(IteratorA, IteratorB)*)
 /// AX=B
 unittest
 {
+    import std.complex;
     import std.meta: AliasSeq;
     import mir.ndslice;
 
@@ -619,6 +621,7 @@ unittest
 /// Ax=B
 unittest
 {
+    import std.complex;
     import std.meta: AliasSeq;
     import mir.ndslice;
 
@@ -650,6 +653,7 @@ unittest
 /// Least-Squares Solution of Underdetermined System
 unittest
 {
+    import std.complex;
     import std.meta: AliasSeq;
     import mir.ndslice;
 
@@ -2378,6 +2382,7 @@ unittest
 
 unittest
 {
+    import std.complex;
     auto A =
             [ 1,  1,  0,
               1,  0,  1,
