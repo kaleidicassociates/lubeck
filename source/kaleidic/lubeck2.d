@@ -483,7 +483,7 @@ struct SvdResult(T)
     ///
     Slice!(RCI!T, 2) u;
     ///Singular Values
-    Slice!(RCI!T) sigma;
+    Slice!(RCI!(realType!T)) sigma;
     ///
     Slice!(RCI!T, 2) vt;
 }
@@ -511,7 +511,7 @@ Returns: error code from CBlas
     auto m = cast(lapackint)a.length!1;
     auto n = cast(lapackint)a.length!0;
 
-    auto s = mininitRcslice!T(min(m, n));
+    auto s = mininitRcslice!(realType!T)(min(m, n));
     auto u = mininitRcslice!T(slim ? s.length : m, m);
     auto vt = mininitRcslice!T(n, slim ? s.length : n);
 
@@ -532,7 +532,13 @@ Returns: error code from CBlas
             auto rca = rca_sliced.lightScope.canonical;
             auto rcwork = gesvd_wq(jobu, jobvt, rca, u.lightScope.canonical, vt.lightScope.canonical).mininitRcslice!T;
             auto work = rcwork.lightScope;
-            auto info = gesvd(jobu, jobvt, rca, s.lightScope, u.lightScope.canonical, vt.lightScope.canonical, work);
+
+            static if(isComplex!T) {
+                auto rwork = mininitRcslice!(realType!T)(max(1, 5 * min(m, n)));
+                auto info = gesvd!T(jobu, jobvt, rca, s.lightScope, u.lightScope.canonical, vt.lightScope.canonical, work, rwork.lightScope);
+            } else {
+                auto info = gesvd!T(jobu, jobvt, rca, s.lightScope, u.lightScope.canonical, vt.lightScope.canonical, work);
+            }
         }
         else // gesdd
         {
@@ -543,7 +549,15 @@ Returns: error code from CBlas
             auto rca = rca_sliced.lightScope.canonical;
             auto rcwork = gesdd_wq(jobz, rca, u.lightScope, vt.lightScope).minitRcslice!T;
             auto work = rcwork.lightScope;
-            auto info = gesdd(jobz, rca, s.lightScope, u.lightScope, vt.lightScope, work, iwork);
+
+            static if(isComplex!T) {
+                auto mx = max(m, n);
+                auto mn = min(m, n);
+                auto rwork = mininitRcslice!(realType!T)(max(5*mn^^2 + 5*mn, 2*mx*mn + 2*mn^^2 + mn));
+                auto info = gesdd!T(jobz, rca, s.lightScope, u.lightScope, vt.lightScope, work, rwork.lightScope, iwork);
+            } else {
+                auto info = gesdd!T(jobz, rca, s.lightScope, u.lightScope, vt.lightScope, work, iwork);
+            }
         }
         enum msg = (algorithm == "gesvd" ? "svd: DBDSDC did not converge, updating process failed" : "svd: DBDSQR did not converge");
         enforce!("svd: " ~ msg)(!info);
@@ -644,6 +658,42 @@ unittest
     assert(res.vt.shape == [0, 0]);
 
     assert(res.u.all!approxEqual(identity), res.u.to!string);
+}
+
+pure unittest
+{
+    import mir.ndslice;
+    import mir.math;
+    import mir.complex : cabs;
+
+    alias C = Complex!double;
+
+    auto a = mininitRcslice!C(6, 4);
+    a[] = [[7.52,  -1.10,  -7.95,   1.08],
+           [-0.76,   0.62,   9.34,  -7.10],
+           [5.13,   6.62,  -5.66,   0.87],
+           [-4.75,   8.52,   5.75,   5.30],
+           [1.33,   4.91,  -5.49,  -3.52],
+           [-2.40,  -6.77,   2.34,   3.95]];
+
+    auto r1 = a.svd;
+
+    auto sigma1 = rcslice!C(a.shape, C(0));
+    sigma1.diagonal[] = r1.sigma;
+    auto m1 = (r1.u).mtimes(sigma1).mtimes(r1.vt);
+    assert(equal!((a, b) => cabs(a-b)< 1e-8)(a, m1));
+
+    auto r2 = a.svd;
+
+    auto sigma2 = rcslice!C(a.shape, C(0));
+    sigma2.diagonal[] = r2.sigma;
+    auto m2 = r2.u.mtimes(sigma2).mtimes(r2.vt);
+
+    assert(equal!((a, b) => cabs(a-b)< 1e-8)(a, m2));
+
+    auto r = a.svd(Yes.slim);
+    assert(r.u.shape == [6, 4]);
+    assert(r.vt.shape == [4, 4]);
 }
 
 struct EigenResult(T)

@@ -371,7 +371,7 @@ struct SvdResult(T)
     ///
     Slice!(T*, 2) u;
     ///
-    Slice!(T*) sigma;
+    Slice!(realType!T*) sigma;
     ///
     Slice!(T*, 2) vt;
 }
@@ -406,7 +406,7 @@ auto svd(
     auto m = cast(lapackint)a.length!1;
     auto n = cast(lapackint)a.length!0;
 
-    auto s = uninitSlice!T(min(m, n));
+    auto s = uninitSlice!(realType!T)(min(m, n));
     auto u = uninitSlice!T(slim ? s.length : m, m);
     auto vt = uninitSlice!T(n, slim ? s.length : n);
 
@@ -424,7 +424,14 @@ auto svd(
             auto jobu = slim ? 'S' : 'A';
             auto jobvt = slim ? 'S' : 'A';
             auto work = gesvd_wq(jobu, jobvt, a, u.canonical, vt.canonical).uninitSlice!T;
-            auto info = gesvd(jobu, jobvt, a, s, u.canonical, vt.canonical, work);
+
+            static if(isComplex!T) {
+                auto rwork = uninitSlice!(realType!T)(max(1, 5 * min(m, n)));
+                auto info = gesvd!T(jobu, jobvt, a, s, u.canonical, vt.canonical, work, rwork);
+            } else {
+                auto info = gesvd(jobu, jobvt, a, s, u.canonical, vt.canonical, work);
+            }
+
             enum msg = "svd: DBDSQR did not converge";
         }
         else // gesdd
@@ -432,7 +439,16 @@ auto svd(
             auto iwork = uninitSlice!lapackint(s.length * 8);
             auto jobz = slim ? 'S' : 'A';
             auto work = gesdd_wq(jobz, a, u.canonical, vt.canonical).uninitSlice!T;
-            auto info = gesdd(jobz, a, s, u.canonical, vt.canonical, work, iwork);
+
+            static if(isComplex!T) {
+                auto mx = max(m, n);
+                auto mn = min(m, n);
+                auto rwork = uninitSlice!(realType!T)(max(5*mn^^2 + 5*mn, 2*mx*mn + 2*mn^^2 + mn));
+                auto info = gesdd!T(jobz, a, s, u.canonical, vt.canonical, work, rwork, iwork);
+            } else {
+                auto info = gesdd(jobz, a, s, u.canonical, vt.canonical, work, iwork);
+            }
+
             enum msg = "svd: DBDSDC did not converge, updating process failed";
         }
         import std.exception: enforce;
@@ -510,6 +526,32 @@ unittest
     assert(res.vt.shape == [0, 0]);
 
     assert(res.u.all!approxEqual(identity), res.u.to!string);
+}
+
+unittest
+{
+    import mir.ndslice;
+
+    alias C = Complex!double;
+
+    auto a =  [
+        7.52,  -1.10,  -7.95,   1.08,
+        -0.76,   0.62,   9.34,  -7.10,
+         5.13,   6.62,  -5.66,   0.87,
+        -4.75,   8.52,   5.75,   5.30,
+         1.33,   4.91,  -5.49,  -3.52,
+        -2.40,  -6.77,   2.34,   3.95]
+        .sliced(6, 4).map!(a => C(a)).slice();
+
+    auto r = a.svd;
+
+    auto sigma = slice!C(a.shape, C(0));
+    sigma.diagonal[] = r.sigma;
+    auto m = r.u.mtimes(sigma).mtimes(r.vt);
+
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    assert(equal!((a, b) => a.approxEqual(b, 1e-8, 1e-8))(a, m));
 }
 
 /++
