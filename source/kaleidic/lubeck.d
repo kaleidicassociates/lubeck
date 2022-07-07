@@ -989,6 +989,60 @@ unittest
 }
 
 /++
+Pearson product-moment correlation coefficients.
+
+Params:
+    matrix = matrix whose rows represent observations and whose columns represent random variables.
+Returns:
+    The correlation coefficient matrix of the variables.
++/
+Slice!(BlasType!Iterator*, 2)
+    corrcoef(Iterator, SliceKind kind)(Slice!(Iterator, 2, kind) matrix)
+{
+    import mir.math.common: sqrt;
+    import core.lifetime: move;
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto ret = cov(move(matrix));
+
+    foreach (i; 0 .. ret.length)
+    {
+        auto isq = 1 / sqrt(ret[i, i]);
+        ret[i, i] = 1;
+        ret[i, i + 1 .. ret.length] *= isq;
+        ret[0 .. i, i] *= isq;
+    }
+
+    ret.eachUploPair!"b = a";
+    return ret;
+}
+
+///
+unittest
+{
+    import mir.ndslice;
+
+    import std.stdio;
+    import mir.ndslice;
+
+    auto m =
+      [0.77395605, 0.43887844, 0.85859792,
+       0.69736803, 0.09417735, 0.97562235,
+       0.7611397 , 0.78606431, 0.12811363].sliced(3, 3);
+
+    auto result =
+       [1.        ,  0.99256089, -0.68080986,
+        0.99256089,  1.        , -0.76492172,
+       -0.68080986, -0.76492172,  1.        ].sliced(3, 3);
+
+    auto corr = m.transposed.corrcoef;
+
+    import mir.math.common: approxEqual;
+    import mir.algorithm.iteration: all;
+    assert(corr.all!((a, b) => approxEqual(a, b, 1e-5, 1e-5))(result));
+}
+
+/++
 Matrix determinant.
 +/
 auto detSymmetric(Iterator, SliceKind kind)(char store, Slice!(Iterator, 2, kind) a)
