@@ -550,7 +550,7 @@ unittest
     auto m = r.u.mtimes(sigma).mtimes(r.vt);
 
     import mir.algorithm.iteration: equal;
-    import mir.math.common: approxEqual;
+    import mir.complex.math: approxEqual;
     assert(equal!((a, b) => a.approxEqual(b, 1e-8, 1e-8))(a, m));
 }
 

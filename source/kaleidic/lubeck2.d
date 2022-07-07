@@ -812,6 +812,7 @@ unittest
 {
     import mir.ndslice;
     import mir.math;
+    import mir.complex.math: approxEqual;
 
     auto data = mininitRcslice!(Complex!double)(3, 3);
     data[] = [[12, -51,   4],
@@ -897,6 +898,7 @@ unittest
     import mir.complex;
     import mir.ndslice;
     import mir.math;
+    import mir.complex.math: approxEqual;
 
     auto data = 
         [[ 0, 1],
@@ -909,6 +911,8 @@ unittest
     auto res = data.eigen;
 
     assert(res.eigenvalues.equal!approxEqual(eigenvalues));
+
+    import mir.math.common: approxEqual;
     foreach (i; 0 .. eigenvectors.length)
         assert((res.eigenvectors.lightScope[i] / eigenvectors[i]).diff.slice.nrm2.approxEqual(0));
 }
@@ -922,6 +926,8 @@ unittest
     import mir.ndslice;
     import mir.math;
     import mir.blas;
+    import mir.math.common: fapproxEqual = approxEqual;
+    import mir.complex.math: approxEqual;
 
     auto data =
         [[0, 1, 0],
@@ -939,14 +945,14 @@ unittest
 
     assert(res.eigenvalues.equal!approxEqual(eigenvalues));
     foreach (i; 0 .. eigenvectors.length)
-        assert((res.eigenvectors.lightScope[i] / eigenvectors[i]).diff.slice.nrm2.approxEqual(0));
+        assert((res.eigenvectors.lightScope[i] / eigenvectors[i]).diff.slice.nrm2.fapproxEqual(0));
 
     auto cdata = data.lightScope.as!(Complex!double).rcslice;
     res = cdata.eigen;
 
     assert(res.eigenvalues.equal!approxEqual(eigenvalues));
     foreach (i; 0 .. eigenvectors.length)
-        assert((res.eigenvectors.lightScope[i] / eigenvectors[i]).diff.slice.nrm2.approxEqual(0));
+        assert((res.eigenvectors.lightScope[i] / eigenvectors[i]).diff.slice.nrm2.fapproxEqual(0));
 }
 
 
