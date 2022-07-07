@@ -999,7 +999,7 @@ Returns:
 Slice!(BlasType!Iterator*, 2)
     corrcoef(Iterator, SliceKind kind)(Slice!(Iterator, 2, kind) matrix)
 {
-    import mir.math.common: sqrt;
+    import mir.math.common: sqrt, fmin, fmax;
     import core.lifetime: move;
     import mir.algorithm.iteration: eachUploPair;
 
@@ -1013,7 +1013,7 @@ Slice!(BlasType!Iterator*, 2)
         ret[0 .. i, i] *= isq;
     }
 
-    ret.eachUploPair!"b = a";
+    ret.eachUploPair!((ref a, ref b){b = a = a.fmax(-1).fmin(+1);});
     return ret;
 }
 
