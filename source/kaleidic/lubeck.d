@@ -737,6 +737,83 @@ unittest
     }
 }
 
+/++
+ Solves the equation
+
+    A*X = B,
+
+ where A is an n by n tridiagonal matrix, by Gaussian elimination with
+ partial pivoting.
++/
+auto solveTridiagonal(Flag!"allowDestroy" allowDestroy = No.allowDestroy, IteratorD, SliceKind kindD, IteratorB, SliceKind kindB, size_t N)
+    (
+        Slice!(IteratorD, 1, kindD) lowerDiag,
+        Slice!(IteratorD, 1, kindD) mainDiag,
+        Slice!(IteratorD, 1, kindD) upperDiag,
+        Slice!(IteratorB, N, kindB) b,
+    )
+    if (N == 1 || N == 2)
+{
+    alias D = BlasType!IteratorD;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(B, D);
+
+    if (!(mainDiag.length == 0 && lowerDiag.length == 0 || lowerDiag.length + 1 == mainDiag.length))
+        throw new Exception("gtsv: 'lowerDiag' has to have length equal to N - 1, where N is length of 'mainDiag'.");
+    if (!(upperDiag.length == lowerDiag.length))
+        throw new Exception("gtsv: 'upperDiag' has to have length equal to N - 1, where N is length of 'mainDiag'.");
+    if (!(mainDiag.length!0 == b.length))
+        throw new Exception("gtsv: The input 'b' has to be N-by-NRHS matrix where N is length of 'mainDiag'.");
+
+    static if (allowDestroy && kindD != Universal && is(IterstorD == T*))
+    {
+        alias dl = lowerDiag;
+        alias d  = mainDiag;
+        alias du = upperDiag;
+    }
+    else
+    {
+        auto dl = lowerDiag.as!T.slice;
+        auto d  = mainDiag.as!T.slice;
+        auto du = upperDiag.as!T.slice;
+    }
+
+    static if(N == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
+
+    auto info = gtsv(dl, d, du, m);
+    assert(info == 0);
+
+    static if (N == 1)
+        return m.front;
+    else
+        return m.transposed;
+}
+
+///
+unittest
+{
+    auto dl = [3.,1,3].sliced;
+    auto d = [10.,10.,7.,4.].sliced;
+    auto du = [2.,4.,5.].sliced;
+    auto b = [3,4,5,6.].sliced;
+    auto res = [0.1487758945386064, 0.756120527306968, -1.0018832391713748, 2.251412429378531];
+
+    import mir.math.common: approxEqual;
+    import mir.algorithm.iteration: equal;
+    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+
+    assert(appr(solveTridiagonal(dl, d, du, b), res));
+    assert(appr(solveTridiagonal(dl, d, du, b.sliced(b.length, 1)), res.sliced(res.length, 1)));
+}
+
 /// Principal component analises result.
 struct PcaResult(T)
 {
