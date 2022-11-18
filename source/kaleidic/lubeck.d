@@ -319,8 +319,8 @@ do
         info = getri(m, ipiv, m.getri_wq.uninitSlice!T);
     }
 
-    import std.exception: enforce;
-    enforce(info == 0, "inv: matrix is singular");
+    import mir.exception: enforce;
+    enforce!"inv: matrix is singular"(info == 0);
     return m;
 }
 
@@ -451,8 +451,8 @@ auto svd(
 
             enum msg = "svd: DBDSDC did not converge, updating process failed";
         }
-        import std.exception: enforce;
-        enforce(info == 0, msg);
+        import mir.exception: enforce;
+        enforce!msg(info == 0);
     }
     return SvdResult!T(vt, s, u); //transposed
 }
@@ -565,8 +565,7 @@ Slice!(BlasType!(IteratorA, IteratorB)*, 2)
         Slice!(IteratorA, 2, kindA) a,
         Slice!(IteratorB, 2, kindB) b)
 {
-    import std.exception: enforce;
-    import std.conv: to;
+    import mir.conv: to;
 
     assert(a.length!0 == b.length!0);
 
@@ -611,7 +610,8 @@ Slice!(BlasType!(IteratorA, IteratorB)*, 2)
             auto info = gelsd!C(a_, b_, s, rcond, rank, work, rwork, iwork);
         }
 
-        enforce(info == 0, to!string(info) ~ " off-diagonal elements of an intermediate bidiagonal form did not converge to zero.");
+        if (info)
+            throw new Exception(to!string(info) ~ " off-diagonal elements of an intermediate bidiagonal form did not converge to zero.");
         b_ = b_[0 .. $, 0 .. a_.length!0];
     }
 
@@ -759,11 +759,11 @@ auto solveTridiagonal(Flag!"allowDestroy" allowDestroy = No.allowDestroy, Iterat
     alias T = CommonType!(B, D);
 
     if (!(mainDiag.length == 0 && lowerDiag.length == 0 || lowerDiag.length + 1 == mainDiag.length))
-        throw new Exception("gtsv: 'lowerDiag' has to have length equal to N - 1, where N is length of 'mainDiag'.");
+        throw new Exception("solveTridiagonal: 'lowerDiag' has to have length equal to N - 1, where N is length of 'mainDiag'.");
     if (!(upperDiag.length == lowerDiag.length))
-        throw new Exception("gtsv: 'upperDiag' has to have length equal to N - 1, where N is length of 'mainDiag'.");
+        throw new Exception("solveTridiagonal: 'upperDiag' has to have length equal to N - 1, where N is length of 'mainDiag'.");
     if (!(mainDiag.length!0 == b.length))
-        throw new Exception("gtsv: The input 'b' has to be N-by-NRHS matrix where N is length of 'mainDiag'.");
+        throw new Exception("solveTridiagonal: The input 'b' has to be N-by-NRHS matrix where N is length of 'mainDiag'.");
 
     static if (allowDestroy && kindD != Universal && is(IterstorD == T*))
     {
@@ -808,10 +808,120 @@ unittest
 
     import mir.math.common: approxEqual;
     import mir.algorithm.iteration: equal;
-    alias appr = equal!((a, b) => approxEqual(a, b, 1e-5, 1e-5));
+    alias appr = equal!approxEqual;
 
     assert(appr(solveTridiagonal(dl, d, du, b), res));
     assert(appr(solveTridiagonal(dl, d, du, b.sliced(b.length, 1)), res.sliced(res.length, 1)));
+}
+
+/++
+ Solves a triangular system of the form
+
+    A * X = B  or  A**T * X = B,
+
+ where A is a triangular matrix of order N, and B is an N-by-NRHS
+ matrix.  A check is made to verify that A is nonsingular.
+
+Params:
+    uplo =
+          - 'U':  A is upper triangular;
+          - 'L':  A is lower triangular.
+    trans =
+          Specifies the form of the system of equations:
+          - 'N':  A * X = B  (No transpose)
+          - 'T':  A**T * X = B  (Transpose)
+          - 'C':  A**H * X = B  (Conjugate transpose = Transpose)
+    diag =
+          - 'N':  A is non-unit triangular;
+          - 'U':  A is unit triangular.
+    a = A
+    b = B
++/
+auto solveTriangular(Flag!"allowDestroy" allowDestroy = No.allowDestroy, IteratorA, SliceKind kindA, IteratorB, SliceKind kindB, size_t N)
+    (
+        char uplo,
+        Slice!(IteratorA, 2, kindA) a,
+        Slice!(IteratorB, N, kindB) b,
+        char trans = 'N',
+        char diag = 'N',
+    )
+    if (N == 1 || N == 2)
+{
+    import mir.conv: to;
+
+    alias A = BlasType!IteratorA;
+    alias B = BlasType!IteratorB;
+    alias T = CommonType!(B, A);
+
+    if (uplo != 'U' && uplo != 'L')
+        throw new Exception("solveTriangular: uplo has to be equal 'U' or 'L'");
+    if (trans != 'N' && trans != 'T' && trans != 'H')
+        throw new Exception("solveTriangular: trans has to be equal 'N', 'T', or 'H'");
+    if (diag != 'N' && diag != 'U')
+        throw new Exception("solveTriangular: diag has to be equal 'N' or 'U'");
+ 
+    if (a.length!0 != a.length!1)
+        throw new Exception("solveTriangular: The input 'a' must be a square matrix.");
+    if (a.length!0 != b.length!0)
+        throw new Exception("solveTriangular: The input 'b' has to be N-by-NRHS matrix where N is order of 'a'.");
+    
+    uplo = uplo == 'U' ? 'L' : 'U';
+
+    static if (isComplex!T)
+        auto isH = trans == 'H';
+    else
+        enum isH = false;
+
+    if (!isH)
+        trans = trans == 'N' ? 'T' : 'N';
+
+    static if(is(IteratorA == T*))
+        auto a_ = isH ?
+            a.transposed.as!T.slice.canonical :
+            (allowDestroy && a._stride!1 == 1) ?
+                a.assumeCanonical :
+                a.as!T.slice.canonical;
+    else
+        auto a_ = isH ?
+            a.transposed.as!T.slice.canonical :
+            a.as!T.slice.canonical;
+
+    static if(N == 1)
+        auto k = b.sliced(1, b.length);
+    else
+        auto k = b.transposed;
+
+    static if(is(IteratorB == T*))
+        auto m = (allowDestroy && k._stride!1 == 1) ? k.assumeCanonical : k.as!T.slice.canonical;
+    else
+        auto m = k.as!T.slice.canonical;
+
+    auto info = trtrs(uplo, trans, diag, a_, m);
+
+    if (info)
+        throw new Exception("The " ~ to!string(info) ~ "-th diagonal element of A is zero,
+               indicating that the matrix is singular and the solutions
+               X have not been computed.");
+
+    static if (N == 1)
+        return m.front;
+    else
+        return m.transposed;
+}
+
+///
+unittest
+{
+    auto a = [3.0, 1, -5, 0, -2, 4, 0, 0, 2].sliced(3, 3);
+    auto b = [1.0, 10, 6].sliced;
+    auto res = [5, 1, 3];
+
+    import mir.math.common: approxEqual;
+    import mir.algorithm.iteration: equal;
+    alias appr = equal!approxEqual;
+
+    assert(appr(solveTriangular('U', a, b), res));
+    assert(appr(solveTriangular('U', a, b.sliced(b.length, 1)), res.sliced(res.length, 1)));
 }
 
 /// Principal component analises result.
@@ -1307,6 +1417,7 @@ in
 }
 do
 {
+    import mir.conv: to;
     import mir.algorithm.iteration: each;
     import mir.ndslice.topology: diagonal;
     import mir.math.numeric: ProdAccumulator;
@@ -1341,10 +1452,9 @@ do
         pck.each!"a[] = b"(gen);
         info = spev!T(jobz, pck, w, z.canonical, work);
     }
-    import std.exception: enforce;
-    import std.format: format;
-    enforce (info == 0, format("The algorithm failed to converge." ~
-        "%s off-diagonal elements of an intermediate tridiagonal form did not converge to zero.", info));
+    if (info)
+        throw new Exception("The algorithm failed to converge. " ~ info.to!string ~
+        " off-diagonal elements of an intermediate tridiagonal form did not converge to zero.");
     static if (cv)
     {
         return EigSymmetricResult!T(w, z);
@@ -2100,14 +2210,14 @@ in
 }
 do
 {
-    import mir.exception: MirException;
+    import mir.conv: to;
     alias T = BlasType!Iterator;
     static if(is(Iterator == T*))
         auto m = (allowDestroy && a._stride!1 == 1) ? a.assumeCanonical : a.as!T.slice.canonical;
     else
         auto m = a.as!T.slice.canonical;
     if (auto info = potrf!T(uplo == 'U' ? 'L' : 'U', m))
-        throw new MirException("Leading minor of order ", info, " is not positive definite, and the factorization could not be completed.");
+        throw new Exception("Leading minor of order " ~ info.to!string ~ " is not positive definite, and the factorization could not be completed.");
     import mir.algorithm.iteration: eachUploPair;
     auto d = m.universal;
     if (uplo == 'U')
