@@ -74,12 +74,24 @@ unittest
 }
 
 /++
-General matrix-matrix multiplication. Allocates result to using Mir refcounted arrays.
+General matrix-matrix multiplication. Allocates result to using Mir refcounted
+arrays.
+
+This function has multiple overloads that include the following functionality:
+- a.mtimes(b) where `a` and `b` are both two-dimensional slices. The result is a
+two-dimensional slice.
+- a.mtimes(b) where `a` is a two-dimensional slice and `b` is a one-dimensional
+slice. The result is a one-dimensional slice. In this case, `b` can be thought
+of as a column vector.
+- b.mtimes(a) where `a` is a two-dimensional slice and `b` is a one-dimensional
+slice. The result is a one-dimensional slice. In this case, `b` can be thought
+of as a row vector.
+
 Params:
-a = m(rows) x k(cols) matrix
-b = k(rows) x n(cols) matrix
+    a = m(rows) x k(cols) matrix
+    b = k(rows) x n(cols) matrix
 Result: 
-m(rows) x n(cols)
+    m(rows) x n(cols)
 +/
 @safe pure nothrow @nogc
 Slice!(RCI!T, 2) mtimes(T, SliceKind kindA, SliceKind kindB)(
@@ -98,7 +110,7 @@ out (c)
 }
 do
 {
-    // optimisations for spcecial cases can be added in the future
+    // optimisations for special cases can be added in the future
     auto c = mininitRcslice!T(a.length!0, b.length!1);
     gemm(cast(T)1, a, b, cast(T)0, c.lightScope);
     return c;
@@ -127,7 +139,7 @@ Slice!(RCI!(Unqual!A), 2) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
     auto ref const Slice!(RCI!A, 2, kindA) a,
     Slice!(const(B)*, 2, kindB) b
 )
-if (is(Unqual!A == Unqual!B))
+    if (is(Unqual!A == Unqual!B))
 in
 {
     assert(a.length!1 == b.length!0);
@@ -138,12 +150,13 @@ do
     return .mtimes(scopeA, b);
 }
 
+/// ditto
 @safe pure nothrow @nogc
 Slice!(RCI!(Unqual!A), 2) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
     Slice!(const(A)*, 2, kindA) a,
     auto ref const Slice!(RCI!B, 2, kindB) b
 )
-if (is(Unqual!A == Unqual!B))
+    if (is(Unqual!A == Unqual!B))
 in
 {
     assert(a.length!1 == b.length!0);
@@ -153,6 +166,155 @@ do
     auto scopeB = b.lightScope.lightConst;
     return .mtimes(a, scopeB);
 }
+
+/// ditto with MxN matrix times Nx1 vector
+@safe pure nothrow @nogc
+Slice!(RCI!T, 1) mtimes(T, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(T)*, 2, kindA) a,
+    Slice!(const(T)*, 1, kindB) b
+)
+    if (isFloatingPoint!T || isComplex!T)
+in
+{
+    assert(a.length!1 == b.length!0);
+}
+out (c)
+{
+    assert(c.length == a.length);
+}
+do
+{
+    auto c = mininitRcslice!T(a.length!0);
+    gemv(cast(T)1, a, b, cast(T)0, c.lightScope);
+    return c;
+}
+
+/// ditto with MxN matrix times Nx1 vector
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 1) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .mtimes(scopeA, scopeB);
+}
+
+/// ditto with MxN matrix times Nx1 vector
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 1) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    Slice!(const(B)*, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .mtimes(scopeA, b);
+}
+
+/// ditto with MxN matrix times Nx1 vector
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 1) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0);
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .mtimes(a, scopeB);
+}
+
+/// ditto with 1xM vector times MxN matrix
+@safe pure nothrow @nogc
+Slice!(RCI!T, 1) mtimes(T, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(T)*, 1, kindB) b,
+    Slice!(const(T)*, 2, kindA) a
+)
+    if (isFloatingPoint!T || isComplex!T)
+in
+{
+    assert(a.length!0 == b.length!0);
+}
+out (c)
+{
+    assert(c.length == a.length!1);
+}
+do
+{
+    auto c = mininitRcslice!T(a.length!1);
+    gemv(cast(T)1, a.transposed, b, cast(T)0, c.lightScope);
+    return c;
+}
+
+/// ditto with 1xM vector times MxN matrix
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 1) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!B, 1, kindB) b,
+    auto ref const Slice!(RCI!A, 2, kindA) a
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .mtimes(scopeB, scopeA);
+}
+
+/// ditto with 1xM vector times MxN matrix
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 1) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(B)*, 1, kindB) b,
+    auto ref const Slice!(RCI!A, 2, kindA) a
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .mtimes(b, scopeA);
+}
+
+/// ditto with 1xM vector times MxN matrix
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 1) mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!B, 1, kindB) b,
+    Slice!(const(A)*, 2, kindA) a
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0);
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .mtimes(scopeB, a);
+}
+
 /// Real numbers
 @safe pure nothrow
 unittest
@@ -208,6 +370,31 @@ unittest
         [[-42,  35,  -7, 77],
          [-69, -21, -42, 21],
          [ 23,  69,   3, 29]]);
+}
+
+/// Specialization for MxN times Nx1
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.algorithm.iteration: equal;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[3.0, 5, 2, -3], [-2.0, 2, 3, 10], [0.0, 2, 1, 1]];
+    static immutable b = [2.0, 3, 4, 5];
+    static immutable c = [14.0, 64, 15];
+
+    auto X = mininitRcslice!double(3, 4);
+    auto y = mininitRcslice!double(4);
+    auto result = mininitRcslice!double(3);
+
+    X[] = a;
+    y[] = b;
+    result[] = c;
+
+    auto Xy = X.mtimes(y);
+    assert(Xy.equal(result));
+    auto yXT = y.mtimes(X.transposed);
+    assert(yXT.equal(result));
 }
 
 /++
