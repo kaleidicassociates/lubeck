@@ -150,10 +150,15 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
                           assumedMatrix == AssumedMatrix.selfAdjointRight) {
             import cblas: Uplo, Side;
             static if (isFloatingPoint!T)
-                static if (assumedMatrix == AssumedMatrix.selfAdjoint)
+                static if (assumedMatrix == AssumedMatrix.selfAdjoint) {
                     symm(Side.Left, Uplo.Upper, cast(T)1, a, b, cast(T)0, c.lightScope);
-                else
+                } else {
+                    static if (kindA == Universal) {
+                        assert(a._stride!1 == 1 && c.universal._stride!1 == 1,
+                               "stride of `a` and output do not match, most likely the result of a transpose operation, try allocating `a` before passing it to the function, such as `a.rcslice.mtimes(b)`");
+                    }
                     symm(Side.Right, Uplo.Upper, cast(T)1, b, a, cast(T)0, c.lightScope);
+                }
             else
                 static assert(0, "Complex version not implemented");
         } else {
@@ -436,6 +441,60 @@ unittest
         [[-42,  35,  -7, 77],
          [-69, -21, -42, 21],
          [ 23,  69,   3, 29]]);
+
+    assert(mtimes(b.transposed, a.transposed) ==
+        [[-42, -69, 23],
+         [ 35, -21, 69],
+         [ -7, -42,  3],
+         [ 77,  21, 29]]);
+}
+
+// test mixed strides
+@safe pure nothrow
+unittest
+{
+    import mir.ndslice;
+    import mir.math;
+
+    auto a = mininitRcslice!double(3, 5);
+    auto b = mininitRcslice!double(5, 4);
+
+    a[] =
+    [[-5,  1,  7, 7, -4],
+     [-1, -5,  6, 3, -3],
+     [-5, -2, -3, 6,  0]];
+
+    b[] =
+    [[-5, -3,  3,  1],
+     [ 4,  3,  6,  4],
+     [-4, -2, -2,  2],
+     [-1,  9,  4,  8],
+     [ 9,  8,  3, -2]];
+         
+    auto at = mininitRcslice!double(5, 3);
+    at[] =
+    [[-5, -1, -5],
+     [ 1, -5, -2],
+     [ 7,  6, -3],
+     [ 7,  3,  6],
+     [-4, -3,  0]];
+     assert(mtimes(b.transposed, at) ==
+        [[-42, -69, 23],
+         [ 35, -21, 69],
+         [ -7, -42,  3],
+         [ 77,  21, 29]]);
+
+    auto bt = mininitRcslice!double(4, 5);
+    bt[] =
+    [[-5, 4, -4, -1,  9],
+     [-3, 3, -2,  9,  8],
+     [ 3, 6, -2,  4,  3],
+     [ 1, 4,  2,  8, -2]];
+     assert(mtimes(bt, a.transposed) ==
+        [[-42, -69, 23],
+         [ 35, -21, 69],
+         [ -7, -42,  3],
+         [ 77,  21, 29]]);
 }
 
 /// Matrix-matrix multiplication (complex)
@@ -498,6 +557,7 @@ unittest
 {
     import mir.algorithm.iteration: equal;
     import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.topology: universal;
 
     static immutable a = [[3.0, 5, 2], [5.0, 2, 3], [2.0, 3, 1]];
     static immutable b = [[2.0, 3], [4.0, 3], [0.0, -5]];
@@ -518,6 +578,9 @@ unittest
     assert(XY.equal(result));
     auto YTX = YT.mtimes!"selfAdjointRight"(X);
     assert(YTX.equal(result.transposed));
+    // may need to allocate transposed LHS
+    auto YtransX = Y.transposed.rcslice.mtimes!"selfAdjointRight"(X);
+    assert(YtransX.equal(result.transposed));
 }
 
 /// Symmetric Matrix, specialization for MxN times Nx1
