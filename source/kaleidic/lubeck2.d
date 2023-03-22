@@ -234,7 +234,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (isFloatingPoint!T || isComplex!T)
     in
     {
-        assert(a.length!1 == b.length!0);
+        assert(a.length!1 == b.length);
         static if (assumedMatrix == AssumedMatrix.selfAdjoint ||
                    assumedMatrix == AssumedMatrix.selfAdjointRight) {
             assert(a.length!0 == a.length!1);
@@ -273,7 +273,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (is(Unqual!A == Unqual!B))
     in
     {
-        assert(a.length!1 == b.length!0);
+        assert(a.length!1 == b.length);
     }
     do
     {
@@ -291,7 +291,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (is(Unqual!A == Unqual!B))
     in
     {
-        assert(a.length!1 == b.length!0);
+        assert(a.length!1 == b.length);
     }
     do
     {
@@ -308,7 +308,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (is(Unqual!A == Unqual!B))
     in
     {
-        assert(a.length!1 == b.length!0);
+        assert(a.length!1 == b.length);
     }
     do
     {
@@ -331,7 +331,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (isFloatingPoint!T || isComplex!T)
     in
     {
-        assert(a.length!0 == b.length!0);
+        assert(a.length!0 == b.length);
         static if (assumedMatrix == AssumedMatrix.selfAdjoint ||
                    assumedMatrix == AssumedMatrix.selfAdjointRight) {
             assert(a.length!0 == a.length!1);
@@ -366,7 +366,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (is(Unqual!A == Unqual!B))
     in
     {
-        assert(a.length!0 == b.length!0);
+        assert(a.length!0 == b.length);
     }
     do
     {
@@ -384,7 +384,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (is(Unqual!A == Unqual!B))
     in
     {
-        assert(a.length!0 == b.length!0);
+        assert(a.length!0 == b.length);
     }
     do
     {
@@ -401,7 +401,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         if (is(Unqual!A == Unqual!B))
     in
     {
-        assert(a.length!0 == b.length!0);
+        assert(a.length!0 == b.length);
     }
     do
     {
