@@ -29,3 +29,5 @@ lubeck-test-unittest
 build
 builddir
 subprojects/*/
+
+*.pdb
