@@ -149,7 +149,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
         } else static if (assumedMatrix == AssumedMatrix.selfAdjoint ||
                           assumedMatrix == AssumedMatrix.selfAdjointRight) {
             import cblas: Uplo, Side;
-            static if (isFloatingPoint!T)
+            static if (isFloatingPoint!T) {
                 static if (assumedMatrix == AssumedMatrix.selfAdjoint) {
                     symm(Side.Left, Uplo.Upper, cast(T)1, a, b, cast(T)0, c.lightScope);
                 } else {
@@ -159,8 +159,9 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
                     }
                     symm(Side.Right, Uplo.Upper, cast(T)1, b, a, cast(T)0, c.lightScope);
                 }
-            else
+            } else {
                 static assert(0, "Complex version not implemented");
+            }
         } else {
             static assert(0, "Not implemented");
         }
