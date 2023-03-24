@@ -330,12 +330,6 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
     in
     {
         assert(a.length!0 == b.length);
-        static if (assumedMatrix == AssumedMatrix.selfAdjoint ||
-                   assumedMatrix == AssumedMatrix.selfAdjointRight) {
-            assert(a.length!0 == a.length!1);
-            static if (isFloatingPoint!T)
-                assert(isSymmetric(a));
-        }
     }
     out (c)
     {
@@ -343,16 +337,7 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
     }
     do
     {
-        static if (assumedMatrix == AssumedMatrix.general) {
-            auto c = mininitRcslice!T(a.length!1);
-            gemv(cast(T)1, a.transposed, b, cast(T)0, c.lightScope);
-            return c;
-        } else static if (assumedMatrix == AssumedMatrix.selfAdjoint ||
-                          assumedMatrix == AssumedMatrix.selfAdjointRight) {
-            return .mtimes!assumedMatrix(a, b);
-        } else {
-            static assert(0, "Not implemented");
-        }
+        return .mtimes!assumedMatrix(a.universal.transposed, b);
     }
 
     /// ditto
