@@ -16,8 +16,6 @@ import std.traits: isFloatingPoint, Unqual;
 import std.typecons: Flag, Yes, No;
 import mir.complex: Complex;
 
-public import mir.blas: dot;
-
 /++
 Identity matrix.
 
@@ -410,6 +408,82 @@ template mtimes(AssumedMatrix assumedMatrix = AssumedMatrix.general)
     }
 }
 
+/++
+Params:
+    a = 1(rows) x n(cols) vector
+    b = n(rows) x 1(cols) vector
+Result:
+    dot product
++/
+@safe pure nothrow @nogc
+Unqual!A mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 1, kindA) a,
+    Slice!(const(B)*, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    import mir.blas: dot;
+
+    return dot(a, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Unqual!A mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return mtimes(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Unqual!A mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    Slice!(const(B)*, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return mtimes(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Unqual!A mtimes(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return mtimes(a, scopeB);
+}
+
 /// ditto
 template mtimes(string assumedMatrix)
 {
@@ -550,6 +624,43 @@ unittest
     assert(Xy.equal(result));
     auto yXT = y.mtimes(X.transposed);
     assert(yXT.equal(result));
+}
+
+/// Reference-counted dot product
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [-5.0,  1,  7,  7, -4];
+    static immutable b = [ 4.0, -4, -2, 10,  4];
+
+    auto x = mininitRcslice!double(5);
+    auto y = mininitRcslice!double(5);
+
+    x[] = a;
+    y[] = b;
+
+    assert(x.mtimes(y) == 16);
+}
+
+/// Mix slice & RC dot product
+@safe pure nothrow
+unittest
+{
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.slice: sliced;
+
+    static immutable a = [-5.0,  1,  7,  7, -4];
+    static immutable b = [ 4.0, -4, -2, 10,  4];
+
+    auto x = mininitRcslice!double(5);
+    auto y = b.sliced;
+
+    x[] = a;
+
+    assert(x.mtimes(y) == 16);
+    assert(y.mtimes(x) == 16);
 }
 
 /// Symmetric Matrix-Matrix multiplication (real)
@@ -2003,102 +2114,4 @@ Returns:
     auto stdDev = mininitRcslice!double(2);
     assert(normalizeColumns(data, stdDev) == scaled);
     assert(stdDev == [2*sqrt(2.0), sqrt(2.0)]);
-}
-
-/++
-Additional overloads for mir-blas `dot` to handle Mir ref-counted arrays.
-
-Params:
-    a = m(rows) x 1(cols) vector
-    b = m(rows) x 1(cols) vector
-Result:
-    m(rows) x 1(cols)
-
-+/
-@safe pure nothrow @nogc
-Unqual!A dot(A, B, SliceKind kindA, SliceKind kindB)(
-    auto ref const Slice!(RCI!A, 1, kindA) a,
-    auto ref const Slice!(RCI!B, 1, kindB) b
-)
-if (is(Unqual!A == Unqual!B))
-in
-{
-    assert(a.length == b.length);
-}
-do
-{
-    auto scopeA = a.lightScope.lightConst;
-    auto scopeB = b.lightScope.lightConst;
-    return .dot(scopeA, scopeB);
-}
-
-/// ditto
-@safe pure nothrow @nogc
-Unqual!A dot(A, B, SliceKind kindA, SliceKind kindB)(
-    auto ref const Slice!(RCI!A, 1, kindA) a,
-    Slice!(const(B)*, 1, kindB) b
-)
-if (is(Unqual!A == Unqual!B))
-in
-{
-    assert(a.length == b.length);
-}
-do
-{
-    auto scopeA = a.lightScope.lightConst;
-    return .dot(scopeA, b);
-}
-
-/// ditto
-@safe pure nothrow @nogc
-Unqual!A dot(A, B, SliceKind kindA, SliceKind kindB)(
-    Slice!(const(A)*, 1, kindA) a,
-    auto ref const Slice!(RCI!B, 1, kindB) b
-)
-if (is(Unqual!A == Unqual!B))
-in
-{
-    assert(a.length == b.length);
-}
-do
-{
-    auto scopeB = b.lightScope.lightConst;
-    return .dot(a, scopeB);
-}
-
-/// Reference-counted dot product
-@safe pure nothrow @nogc
-unittest
-{
-    import mir.ndslice.allocation: mininitRcslice;
-
-    static immutable a = [-5.0,  1,  7,  7, -4];
-    static immutable b = [ 4.0, -4, -2, 10,  4];
-
-    auto x = mininitRcslice!double(5);
-    auto y = mininitRcslice!double(5);
-
-    x[] = a;
-    y[] = b;
-
-    assert(x.dot(y) == 16);
-}
-
-/// Mix slice & RC dot product
-@safe pure nothrow
-unittest
-{
-    import mir.ndslice.allocation: mininitRcslice;
-    import mir.ndslice.slice: sliced;
-
-    static immutable a = [-5.0,  1,  7,  7, -4];
-    static immutable b = [ 4.0, -4, -2, 10,  4];
-
-    auto x = mininitRcslice!double(5);
-    auto y = b.sliced;
-
-    x[] = a;
-
-    assert(x.dot(y) == 16);
-    assert(y.dot(x) == 16);
 }
