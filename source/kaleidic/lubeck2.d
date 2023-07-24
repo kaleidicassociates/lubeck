@@ -848,7 +848,6 @@ unittest
 {
     import mir.algorithm.iteration: equal;
     import mir.ndslice.allocation: mininitRcslice;
-    import mir.ndslice.topology: universal;
 
     static immutable a = [[3.0, 5, 2], [5.0, 2, 3], [2.0, 3, 1]];
     static immutable b = [[2.0, 3], [4.0, 3], [0.0, -5]];
@@ -870,9 +869,13 @@ unittest
 
     auto YTX = YT.mtimesSymmetric!"Right"(X);
     assert(YTX.equal(result.transposed));
-    // may need to allocate transposed LHS
+    // May need to allocate transposed LHS
     auto YtransX = Y.transposed.rcslice.mtimesSymmetric!"Right"(X);
     assert(YtransX.equal(result.transposed));
+    // Can avoid by transposing problem and result
+    auto YtransX_v2 = X.mtimesSymmetric(Y).transposed;
+    assert(YtransX_v2.equal(result.transposed));
+    
 }
 
 /// Symmetric Matrix, specialization for MxN times Nx1
