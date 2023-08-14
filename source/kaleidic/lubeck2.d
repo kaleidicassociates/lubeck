@@ -2323,3 +2323,119 @@ Returns:
     assert(normalizeColumns(data, stdDev) == scaled);
     assert(stdDev == [2*sqrt(2.0), sqrt(2.0)]);
 }
+
+/++
+Given a matrix `x`, computes the matrix cross-product `x' * x`.
+
+This function uses more specialized algorithms than those used in `mtimes`.
+
+In the vector case, the input is treated as a matrix whose first dimension has a
+length of 1. Since the input is represented in memory as a C-style row vector,
+that is the natural choice in this case.
+
+Params:
+    x = input `M x N` matrix
+
+Returns:
+    `N x N` matrix
+
+See_also:
+    $(LINK2 https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/crossprod, R's crossprod function)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 2, sliceKind) x
+)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!0 == x.length!1, "The first dimension of the result must match the second dimension of the input");
+    assert(result.length!0 == result.length!1, "Result must be a square matrix");
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = mininitRcslice!T(x.length!1, x.length!1);
+    syrk(Uplo.Upper, cast(T)1, x.transposed, cast(T)0, result.lightScope);
+    result.eachUploPair!((u, ref l) { l = u; });
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    auto ref const Slice!(RCI!T, 2, sliceKind) x
+)
+do
+{
+    auto scopeX = x.lightScope.lightConst;
+    return .crossprod(scopeX);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(Slice!(const(T)*, 1, sliceKind) x)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!1 == x.length);
+    assert(result.length!0 == result.length!1);
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = rcslice!T([x.length, x.length], 0);
+    syr(Uplo.Upper, cast(T)1, x, result.lightScope);
+    result.eachUploPair!((u, ref l) { l = u; });
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(auto ref const Slice!(RCI!T, 1, sliceKind) x)
+{
+    auto scopeX = x.lightScope.lightConst;
+    return .crossprod(scopeX);
+}
+
+/// Cross-product
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.algorithm.iteration: equal;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[3.0, 5, 2, -3], [-2.0, 2, 3, 10], [0.0, 2, 1, 1]];
+    static immutable b = [[13.0, 11, 0, -29], [11.0, 33, 18, 7], [0.0, 18, 14, 25], [-29.0, 7, 25, 110]];
+
+    auto X = mininitRcslice!double(3, 4);
+    auto result = mininitRcslice!double(4, 4);
+
+    X[] = a;
+    result[] = b;
+
+    auto Xcross = X.crossprod;
+    assert(Xcross.equal(result));
+}
+
+/// Cross-product (vector)
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.algorithm.iteration: equal;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [3.0, 5, 2, -3];
+    static immutable b = [[9.0, 15, 6, -9], [15.0, 25, 10, -15], [6.0, 10, 4, -6], [-9.0, -15, -6, 9]];
+
+    auto x = mininitRcslice!double(4);
+    auto result = mininitRcslice!double(4, 4);
+
+    x[] = a;
+    result[] = b;
+
+    auto xcross = x.crossprod;
+    assert(xcross.equal(result));
+}
