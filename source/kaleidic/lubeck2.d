@@ -2400,7 +2400,7 @@ Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(auto ref const Slice
     return .crossprod(scopeX);
 }
 
-/// Cross-product
+/// crossprod
 @safe pure nothrow @nogc
 unittest
 {
@@ -2420,7 +2420,7 @@ unittest
     assert(Xcross.equal(result));
 }
 
-/// Cross-product (vector)
+/// crossprod (vector)
 @safe pure nothrow @nogc
 unittest
 {
@@ -2438,4 +2438,107 @@ unittest
 
     auto xcross = x.crossprod;
     assert(xcross.equal(result));
+}
+
+/++
+Given a matrix `x`, computes the matrix cross-product `x * x'`.
+
+This function uses more specialized algorithms than those used in `mtimes` in
+the matrix case.
+
+In the vector case, the input is treated as a matrix whose first dimension has a
+length of 1. Since the input is represented in memory as a C-style row vector,
+that is the natural choice in this case.
+
+Params:
+    x = input `M x N` matrix
+
+Returns:
+    `M x M` matrix
+
+See_also:
+    $(LINK2 https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/crossprod, R's crossprod function)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) tcrossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 2, sliceKind) x
+)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!0 == x.length!0);
+    assert(result.length!0 == result.length!1);
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = mininitRcslice!T(x.length!0, x.length!0);
+    syrk(Uplo.Upper, cast(T)1, x, cast(T)0, result.lightScope);
+    result.eachUploPair!((u, ref l) { l = u; });
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) tcrossprod(T, SliceKind sliceKind)(
+    auto ref const Slice!(RCI!T, 2, sliceKind) x
+)
+do
+{
+    auto scopeX = x.lightScope.lightConst;
+    return .tcrossprod(scopeX);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+T tcrossprod(T, SliceKind sliceKind)(Slice!(const(T)*, 1, sliceKind) x)
+    if (isFloatingPoint!T)
+{
+    return x.mtimes(x);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+T tcrossprod(T, SliceKind sliceKind)(auto ref const Slice!(RCI!T, 1, sliceKind) x)
+{
+    auto scopeX = x.lightScope.lightConst;
+    return .tcrossprod(scopeX);
+}
+
+/// tcrossprod
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.algorithm.iteration: equal;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[3.0, 5, 2, -3], [-2.0, 2, 3, 10], [0.0, 2, 1, 1]];
+    static immutable b = [[47.0, -20, 9], [-20.0, 117, 17], [9.0, 17, 6]];
+
+    auto X = mininitRcslice!double(3, 4);
+    auto result = mininitRcslice!double(3, 3);
+
+    X[] = a;
+    result[] = b;
+
+    auto Xtcross = X.tcrossprod;
+    assert(Xtcross.equal(result));
+}
+
+/// tcrossprod (vector)
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.algorithm.iteration: equal;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [3.0, 5, 2, -3];
+
+    auto x = mininitRcslice!double(4);
+
+    x[] = a;
+
+    auto xtcross = x.tcrossprod;
+    assert(xtcross == 47);
 }
