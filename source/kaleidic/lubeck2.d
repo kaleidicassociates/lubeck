@@ -2350,7 +2350,7 @@ Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
 out (result)
 {
     assert(result.length!0 == x.length!1, "The first dimension of the result must match the second dimension of the input");
-    assert(result.length!0 == result.length!1, "Result must be a square matrix");
+    assert(result.length!0 == result.length!1, "The result must be a square matrix");
 }
 do
 {
@@ -2367,7 +2367,6 @@ do
 Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
     auto ref const Slice!(RCI!T, 2, sliceKind) x
 )
-do
 {
     auto scopeX = x.lightScope.lightConst;
     return .crossprod(scopeX);
@@ -2379,8 +2378,8 @@ Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(Slice!(const(T)*, 1,
     if (isFloatingPoint!T)
 out (result)
 {
-    assert(result.length!1 == x.length);
-    assert(result.length!0 == result.length!1);
+    assert(result.length!1 == x.length, "The second dimension of the result must match the length of the input");
+    assert(result.length!0 == result.length!1, "The result must be a square matrix");
 }
 do
 {
@@ -2466,8 +2465,8 @@ Slice!(RCI!(Unqual!T), 2) tcrossprod(T, SliceKind sliceKind)(
     if (isFloatingPoint!T)
 out (result)
 {
-    assert(result.length!0 == x.length!0);
-    assert(result.length!0 == result.length!1);
+    assert(result.length!0 == x.length!0, "The first dimension of the result must match the first dimension of the input");
+    assert(result.length!0 == result.length!1, "The result must be a square matrix");
 }
 do
 {
@@ -2484,7 +2483,6 @@ do
 Slice!(RCI!(Unqual!T), 2) tcrossprod(T, SliceKind sliceKind)(
     auto ref const Slice!(RCI!T, 2, sliceKind) x
 )
-do
 {
     auto scopeX = x.lightScope.lightConst;
     return .tcrossprod(scopeX);
@@ -2530,7 +2528,6 @@ unittest
 @safe pure nothrow @nogc
 unittest
 {
-    import mir.algorithm.iteration: equal;
     import mir.ndslice.allocation: mininitRcslice;
 
     static immutable a = [3.0, 5, 2, -3];
@@ -2753,6 +2750,34 @@ unittest {
     result[] = c;
 
     auto val = sigma.quadraticForm(w);
+    assert(val.equal!approxEqual(result));
+}
+
+// make sure it works with a transpose
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.dynamic: transposed;
+
+    static immutable a = [[0.010, 0.0030, 0.006],
+                          [0.003, 0.0225, 0.012],
+                          [0.006, 0.0120, 0.040]];
+    static immutable b = [[0.25, 0.3, 0.45],
+                          [0.30, 0.4, 0.30]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(2, 3);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticForm(w.transposed);
     assert(val.equal!approxEqual(result));
 }
 
