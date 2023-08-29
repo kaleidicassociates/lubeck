@@ -2403,7 +2403,6 @@ Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(auto ref const Slice
 @safe pure nothrow @nogc
 unittest
 {
-    import mir.algorithm.iteration: equal;
     import mir.ndslice.allocation: mininitRcslice;
 
     static immutable a = [[3.0, 5, 2, -3], [-2.0, 2, 3, 10], [0.0, 2, 1, 1]];
@@ -2416,14 +2415,13 @@ unittest
     result[] = b;
 
     auto Xcross = X.crossprod;
-    assert(Xcross.equal(result));
+    assert(Xcross == result);
 }
 
 /// crossprod (vector)
 @safe pure nothrow @nogc
 unittest
 {
-    import mir.algorithm.iteration: equal;
     import mir.ndslice.allocation: mininitRcslice;
 
     static immutable a = [3.0, 5, 2, -3];
@@ -2436,7 +2434,7 @@ unittest
     result[] = b;
 
     auto xcross = x.crossprod;
-    assert(xcross.equal(result));
+    assert(xcross == result);
 }
 
 /++
@@ -2508,7 +2506,6 @@ T tcrossprod(T, SliceKind sliceKind)(auto ref const Slice!(RCI!T, 1, sliceKind) 
 @safe pure nothrow @nogc
 unittest
 {
-    import mir.algorithm.iteration: equal;
     import mir.ndslice.allocation: mininitRcslice;
 
     static immutable a = [[3.0, 5, 2, -3], [-2.0, 2, 3, 10], [0.0, 2, 1, 1]];
@@ -2521,7 +2518,7 @@ unittest
     result[] = b;
 
     auto Xtcross = X.tcrossprod;
-    assert(Xtcross.equal(result));
+    assert(Xtcross == result);
 }
 
 /// tcrossprod (vector)
