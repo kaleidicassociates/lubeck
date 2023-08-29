@@ -2707,39 +2707,35 @@ do
 ///
 @safe pure
 unittest {
-    import mir.algorithm.iteration: equal;
-    import mir.math.common: approxEqual;
     import mir.ndslice.fuse: fuse;
     import mir.ndslice.slice: sliced;
 
-    auto sigma = [[0.010, 0.0030, 0.006],
-                  [0.003, 0.0225, 0.012],
-                  [0.006, 0.0120, 0.040]].fuse;
-    auto w = [[0.25, 0.3],
-              [0.30, 0.4],
-              [0.45, 0.3]].fuse;
-    auto result = [[0.01579, 0.01392],
-                   [0.01392, 0.01278]].fuse;
+    auto sigma = [[1.0,  2, 3],
+                  [10.0, 9, 8],
+                  [5.0,  6, 7]].fuse;
+    auto w = [[1.0, 2],
+              [2.0, 6],
+              [4.0, 1]].fuse;
+    auto result = [[317.0, 393],
+                   [439.0, 579]].fuse;
 
     auto val = sigma.quadraticForm(w);
-    assert(val.equal!approxEqual(result));
+    assert(val == result);
 }
 
 /// Ditto, but RC
 @safe pure nothrow @nogc
 unittest {
-    import mir.algorithm.iteration: equal;
-    import mir.math.common: approxEqual;
     import mir.ndslice.allocation: mininitRcslice;
 
-    static immutable a = [[0.010, 0.0030, 0.006],
-                          [0.003, 0.0225, 0.012],
-                          [0.006, 0.0120, 0.040]];
-    static immutable b = [[0.25, 0.3],
-                          [0.30, 0.4],
-                          [0.45, 0.3]];
-    static immutable c = [[0.01579, 0.01392],
-                          [0.01392, 0.01278]];
+    static immutable a = [[1.0,  2, 3],
+                          [10.0, 9, 8],
+                          [5.0,  6, 7]];
+    static immutable b = [[1.0, 2],
+                          [2.0, 6],
+                          [4.0, 1]];
+    static immutable c = [[317.0, 393],
+                          [439.0, 579]];
 
     auto sigma = mininitRcslice!double(3, 3);
     auto w = mininitRcslice!double(3, 2);
@@ -2750,24 +2746,22 @@ unittest {
     result[] = c;
 
     auto val = sigma.quadraticForm(w);
-    assert(val.equal!approxEqual(result));
+    assert(val == result);
 }
 
 // make sure it works with a transpose
 @safe pure nothrow @nogc
 unittest {
-    import mir.algorithm.iteration: equal;
-    import mir.math.common: approxEqual;
     import mir.ndslice.allocation: mininitRcslice;
     import mir.ndslice.dynamic: transposed;
 
-    static immutable a = [[0.010, 0.0030, 0.006],
-                          [0.003, 0.0225, 0.012],
-                          [0.006, 0.0120, 0.040]];
-    static immutable b = [[0.25, 0.3, 0.45],
-                          [0.30, 0.4, 0.30]];
-    static immutable c = [[0.01579, 0.01392],
-                          [0.01392, 0.01278]];
+    static immutable a = [[1.0,  2, 3],
+                          [10.0, 9, 8],
+                          [5.0,  6, 7]];
+    static immutable b = [[1.0, 2, 4],
+                          [2.0, 6, 1]];
+    static immutable c = [[317.0, 393],
+                          [439.0, 579]];
 
     auto sigma = mininitRcslice!double(3, 3);
     auto w = mininitRcslice!double(2, 3);
@@ -2778,7 +2772,7 @@ unittest {
     result[] = c;
 
     auto val = sigma.quadraticForm(w.transposed);
-    assert(val.equal!approxEqual(result));
+    assert(val == result);
 }
 
 /// quadraticForm (vector)
@@ -2786,26 +2780,26 @@ unittest {
 unittest {
     import mir.ndslice.fuse: fuse;
     import mir.ndslice.slice: sliced;
-    import mir.test: shouldApprox;
+    import mir.test: should;
 
-    auto sigma = [[0.010, 0.0030, 0.006],
-                  [0.003, 0.0225, 0.012],
-                  [0.006, 0.0120, 0.040]].fuse;
-    auto w = [0.25, 0.3, 0.45].sliced;
+    auto sigma = [[1.0,  2, 3],
+                  [10.0, 9, 8],
+                  [5.0,  6, 7]].fuse;
+    auto w = [1.0, 2, 4].sliced;
     double val = sigma.quadraticForm(w);
-    val.shouldApprox == 0.01579;
+    val.should == 317;
 }
 
 /// Ditto, but RC
 @safe pure nothrow @nogc
 unittest {
     import mir.ndslice.allocation: mininitRcslice;
-    import mir.test: shouldApprox;
+    import mir.test: should;
 
-    static immutable a = [[0.010, 0.0030, 0.006],
-                          [0.003, 0.0225, 0.012],
-                          [0.006, 0.0120, 0.040]];
-    static immutable b = [0.25, 0.3, 0.45];
+    static immutable a = [[1.0,  2, 3],
+                          [10.0, 9, 8],
+                          [5.0,  6, 7]];
+    static immutable b = [1.0, 2, 4];
 
     auto sigma = mininitRcslice!double(3, 3);
     auto w = mininitRcslice!double(3);
@@ -2814,7 +2808,7 @@ unittest {
     w[] = b;
 
     double val = sigma.quadraticForm(w);
-    val.shouldApprox == 0.01579;
+    val.should == 317;
 }
 
 /++
