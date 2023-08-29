@@ -2816,3 +2816,349 @@ unittest {
     double val = sigma.quadraticForm(w);
     val.shouldApprox == 0.01579;
 }
+
+/++
+Given a symmetric square matrix `a` and another matrix `b`, computes the
+quadratic form `b' * a * b`.
+
+Params:
+    a = input `M x M` matrix
+    b = input `M x N` matrix
+
+Returns:
+    `N x N` matrix
+
+See_also:
+    $(WEB en.wikipedia.org/wiki/Quadratic_form, Quadratic Form)
++/
+@safe pure nothrow @nogc
+template quadraticFormSymmetric(Uplo uplo = Uplo.Upper)
+{
+    Slice!(RCI!(Unqual!T), 2) quadraticFormSymmetric(T, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(T)*, 2, kindA) a,
+        Slice!(const(T)*, 2, kindB) b
+    )
+        if (isFloatingPoint!T)
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    out (result)
+    {
+        assert(result.length!0 == b.length!1, "The first dimension of the result must match the second dimension of `b`");
+        assert(result.length!0 == result.length!1, "`result` must be a square matrix");
+    }
+    do
+    {
+        static if (kindB == Universal) {
+            if (b._stride!1 != 1)
+            {
+                auto result = b.transposed.mtimesSymmetric!(Side.Right, uplo)(a);
+                return result.mtimes(b);
+            }
+        }
+        auto result = a.mtimesSymmetric!(Side.Left, uplo)(b);
+        return b.transposed.mtimes(result);
+    }
+
+    /// ditto
+    Slice!(RCI!(Unqual!A), 2) quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 2, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, scopeB);
+    }
+
+    /// ditto
+    Slice!(RCI!(Unqual!A), 2) quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        Slice!(const(B)*, 2, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, b);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Slice!(RCI!(Unqual!A), 2) quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(A)*, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 2, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(a, scopeB);
+    }
+
+    /// ditto
+    T quadraticFormSymmetric(T, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(T)*, 2, kindA) a,
+        Slice!(const(T)*, 1, kindB) b
+    )
+        if (isFloatingPoint!T)
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto result = a.mtimesSymmetric!uplo(b);
+        return result.mtimes(b);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Unqual!A quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 1, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, scopeB);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Unqual!A quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        Slice!(const(B)*, 1, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, b);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Unqual!A quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(A)*, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 1, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(a, scopeB);
+    }
+}
+
+/// ditto
+template quadraticFormSymmetric(string uplo)
+{
+    mixin("alias quadraticFormSymmetric = .quadraticFormSymmetric!(Uplo." ~ uplo ~ ");");
+}
+
+///
+@safe pure
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.fuse: fuse;
+    import mir.ndslice.slice: sliced;
+
+    auto sigma = [[0.010, 0.0030, 0.006],
+                  [0,     0.0225, 0.012],
+                  [0,     0,      0.040]].fuse;
+    auto w = [[0.25, 0.3],
+              [0.30, 0.4],
+              [0.45, 0.3]].fuse;
+    auto result = [[0.01579, 0.01392],
+                   [0.01392, 0.01278]].fuse;
+
+    auto val = sigma.quadraticFormSymmetric(w);
+    assert(val.equal!approxEqual(result));
+}
+
+/// Ditto, but RC
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[0.010, 0.0030, 0.006],
+                          [0,     0.0225, 0.012],
+                          [0,     0,      0.040]];
+    static immutable b = [[0.25, 0.3],
+                          [0.30, 0.4],
+                          [0.45, 0.3]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3, 2);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric(w);
+    assert(val.equal!approxEqual(result));
+}
+
+// make sure it works with a transpose
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.dynamic: transposed;
+
+    static immutable a = [[0.010, 0.0030, 0.006],
+                          [0,     0.0225, 0.012],
+                          [0,     0,      0.040]];
+    static immutable b = [[0.25, 0.3, 0.45],
+                          [0.30, 0.4, 0.30]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(2, 3);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric(w.transposed);
+    assert(val.equal!approxEqual(result));
+}
+
+/// quadraticFormSymmetric (vector)
+@safe pure
+unittest {
+    import mir.ndslice.fuse: fuse;
+    import mir.ndslice.slice: sliced;
+    import mir.test: shouldApprox;
+
+    auto sigma = [[0.010, 0.0030, 0.006],
+                  [0,     0.0225, 0.012],
+                  [0,     0,      0.040]].fuse;
+    auto w = [0.25, 0.3, 0.45].sliced;
+    double val = sigma.quadraticFormSymmetric(w);
+    val.shouldApprox == 0.01579;
+}
+
+/// Ditto, but RC
+@safe pure nothrow @nogc
+unittest {
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.test: shouldApprox;
+
+    static immutable a = [[0.010, 0.0030, 0.006],
+                          [0,     0.0225, 0.012],
+                          [0,     0,      0.040]];
+    static immutable b = [0.25, 0.3, 0.45];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3);
+
+    sigma[] = a;
+    w[] = b;
+
+    double val = sigma.quadraticFormSymmetric(w);
+    val.shouldApprox == 0.01579;
+}
+
+/// Use template parameter if using lower triangular symmetric matrix
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[0.0100, 0,      0],
+                          [0.0030, 0.0225, 0],
+                          [0.0060, 0.012,  0.040]];
+    static immutable b = [[0.25, 0.3],
+                          [0.30, 0.4],
+                          [0.45, 0.3]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3, 2);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric!"Lower"(w);
+    assert(val.equal!approxEqual(result));
+}
+
+// transposed version with lower triangular symmetric matrix
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.dynamic: transposed;
+
+    static immutable a = [[0.0100, 0,      0],
+                          [0.0030, 0.0225, 0],
+                          [0.0060, 0.012,  0.040]];
+    static immutable b = [[0.25, 0.3, 0.45],
+                          [0.30, 0.4, 0.30]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(2, 3);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric!"Lower"(w.transposed);
+    assert(val.equal!approxEqual(result));
+}
