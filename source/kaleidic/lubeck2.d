@@ -598,11 +598,11 @@ template mtimesSymmetric(Side side = Side.Left, Uplo uplo = Uplo.Upper)
         if (isFloatingPoint!T)
     in
     {
-        assert(a.length!1 == b.length!0);
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must match the first dimension of `b`");
         static if (side == Side.Left)
-            assert(a.length!0 == a.length!1);
+            assert(a.length!0 == a.length!1, "With `Side.Left`, `a` assumed to be a square matrix");
         else
-            assert(b.length!0 == b.length!1);
+            assert(b.length!0 == b.length!1, "With `Side.Right`, `b` assumed to be a square matrix");
     }
     out (c)
     {
@@ -847,7 +847,7 @@ template mtimesSymmetric(string side, string uplo = "Upper")
 unittest
 {
     import mir.algorithm.iteration: equal;
-    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.allocation: mininitRcslice, rcslice;
 
     static immutable a = [[3.0, 5, 2], [5.0, 2, 3], [2.0, 3, 1]];
     static immutable b = [[2.0, 3], [4.0, 3], [0.0, -5]];
