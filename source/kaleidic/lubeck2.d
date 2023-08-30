@@ -2325,39 +2325,41 @@ Returns:
 }
 
 /++
-Given a matrix `x`, computes the matrix cross-product `x' * x`.
+Given a matrix `a`, computes the matrix cross-product `a' * a`. Alternately,
+given matrices `a` and `b`, computes the matrix cross-product `a' * b`.
 
-This function uses more specialized algorithms than those used in `mtimes`.
+This function uses more specialized algorithms than those used in `mtimes` where
+possible.
 
 In the vector case, the input is treated as a matrix whose first dimension has a
 length of 1. Since the input is represented in memory as a C-style row vector,
 that is the natural choice in this case.
 
 Params:
-    x = input `M x N` matrix
+    a = m(rows) x n(cols) matrix
 
-Returns:
-    `N x N` matrix
+Result:
+    n(rows) x n(cols)
 
 See_also:
     $(LINK2 https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/crossprod, R's crossprod function)
 +/
 @safe pure nothrow @nogc
 Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
-    Slice!(const(T)*, 2, sliceKind) x
+    Slice!(const(T)*, 2, sliceKind) a
 )
     if (isFloatingPoint!T)
 out (result)
 {
-    assert(result.length!0 == x.length!1, "The first dimension of the result must match the second dimension of the input");
+    assert(result.length!0 == a.length!1, "The first dimension of the result must match the second dimension of the input");
     assert(result.length!0 == result.length!1, "The result must be a square matrix");
 }
 do
 {
     import mir.algorithm.iteration: eachUploPair;
 
-    auto result = mininitRcslice!T(x.length!1, x.length!1);
-    syrk(Uplo.Upper, cast(T)1, x.transposed, cast(T)0, result.lightScope);
+    auto result = mininitRcslice!T(a.length!1, a.length!1);
+    syrk(Uplo.Upper, cast(T)1, a.transposed, cast(T)0, result.lightScope);
     result.eachUploPair!((u, ref l) { l = u; });
     return result;
 }
@@ -2365,38 +2367,192 @@ do
 /// ditto
 @safe pure nothrow @nogc
 Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
-    auto ref const Slice!(RCI!T, 2, sliceKind) x
+    auto ref const Slice!(RCI!T, 2, sliceKind) a
 )
 {
-    auto scopeX = x.lightScope.lightConst;
-    return .crossprod(scopeX);
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA);
+}
+
+/++
+Params:
+    a = m(rows) x n(cols) matrix
+    b = m(rows) x p(cols) matrix
+
+Result:
+    n(rows) x p(cols)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 2, sliceKind) a,
+    Slice!(const(T)*, 2, sliceKind) b
+)
+    if (isFloatingPoint!T)
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+out (result)
+{
+    assert(result.length!0 == a.length!1, "The first dimension of the result must match the second dimension of `a`");
+    assert(result.length!1 == b.length!1, "The second dimension of the result must match the second dimension of `b`");
+}
+do
+{
+    return a.transposed.mtimes(b);
 }
 
 /// ditto
 @safe pure nothrow @nogc
-Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(Slice!(const(T)*, 1, sliceKind) x)
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    Slice!(const(B)*, 2, sliceKind) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(a, scopeB);
+}
+
+/++
+Params:
+    a = m(rows) x 1(cols) vector
+
+Result:
+    m(rows) x m(cols)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(Slice!(const(T)*, 1, sliceKind) a)
     if (isFloatingPoint!T)
 out (result)
 {
-    assert(result.length!1 == x.length, "The second dimension of the result must match the length of the input");
+    assert(result.length!1 == a.length, "The second dimension of the result must match the length of the input");
     assert(result.length!0 == result.length!1, "The result must be a square matrix");
 }
 do
 {
     import mir.algorithm.iteration: eachUploPair;
 
-    auto result = rcslice!T([x.length, x.length], 0);
-    syr(Uplo.Upper, cast(T)1, x, result.lightScope);
+    auto result = rcslice!T([a.length, a.length], 0);
+    syr(Uplo.Upper, cast(T)1, a, result.lightScope);
     result.eachUploPair!((u, ref l) { l = u; });
     return result;
 }
 
 /// ditto
 @safe pure nothrow @nogc
-Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(auto ref const Slice!(RCI!T, 1, sliceKind) x)
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(auto ref const Slice!(RCI!T, 1, sliceKind) a)
 {
-    auto scopeX = x.lightScope.lightConst;
-    return .crossprod(scopeX);
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA);
+}
+
+/++
+Params:
+    a = m(rows) x 1(cols) vector
+    b = m(rows) x 1(cols) vector
+
+Result:
+    m(rows) x m(cols)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 1, sliceKind) a,
+    Slice!(const(T)*, 1, sliceKind) b
+)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!0 == a.length, "The first dimension of the result must match the length of `a`");
+    assert(result.length!1 == b.length, "The second dimension of the result must match the length of `b`");
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = rcslice!T([a.length, b.length], 0);
+    ger(cast(T)1, a, b, result.lightScope);
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    Slice!(const(B)*, 1, sliceKind) b
+)
+    if (is(Unqual!A == Unqual!B))
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(a, scopeB);
 }
 
 /// crossprod
@@ -2405,17 +2561,35 @@ unittest
 {
     import mir.ndslice.allocation: mininitRcslice;
 
-    static immutable a = [[3.0, 5, 2, -3], [-2.0, 2, 3, 10], [0.0, 2, 1, 1]];
-    static immutable b = [[13.0, 11, 0, -29], [11.0, 33, 18, 7], [0.0, 18, 14, 25], [-29.0, 7, 25, 110]];
+    static immutable a = [[3.0, 5, 2, -3],
+                          [-2.0, 2, 3, 10],
+                          [0.0, 2, 1, 1]];
+    static immutable b = [[ 1.0,  8],
+                          [ 7.0, -3],
+                          [-5.0,  2]];
+    static immutable c = [[13.0, 11, 0, -29],
+                          [11.0, 33, 18, 7],
+                          [0.0, 18, 14, 25],
+                          [-29.0, 7, 25, 110]];
+    static immutable d = [[-11.0,  30],
+                          [  9.0,  38],
+                          [ 18.0,   9],
+                          [ 62.0, -52]];
 
     auto X = mininitRcslice!double(3, 4);
-    auto result = mininitRcslice!double(4, 4);
+    auto Y = mininitRcslice!double(3, 2);
+    auto result1 = mininitRcslice!double(4, 4);
+    auto result2 = mininitRcslice!double(4, 2);
 
     X[] = a;
-    result[] = b;
+    Y[] = b;
+    result1[] = c;
+    result2[] = d;
 
     auto Xcross = X.crossprod;
-    assert(Xcross == result);
+    assert(Xcross == result1);
+    auto XYcross = X.crossprod(Y);
+    assert(XYcross == result2);
 }
 
 /// crossprod (vector)
@@ -2425,16 +2599,30 @@ unittest
     import mir.ndslice.allocation: mininitRcslice;
 
     static immutable a = [3.0, 5, 2, -3];
-    static immutable b = [[9.0, 15, 6, -9], [15.0, 25, 10, -15], [6.0, 10, 4, -6], [-9.0, -15, -6, 9]];
+    static immutable b = [-2.0, 2, 3];
+    static immutable c = [[ 9.0,  15,  6, -9],
+                          [15.0,  25, 10, -15],
+                          [ 6.0,  10,  4, -6],
+                          [-9.0, -15, -6,  9]];
+    static immutable d = [[ -6,  6,  9],
+                          [-10, 10, 15],
+                          [ -4,  4,  6],
+                          [ 6,  -6, -9]];
 
     auto x = mininitRcslice!double(4);
-    auto result = mininitRcslice!double(4, 4);
+    auto y = mininitRcslice!double(3);
+    auto result1 = mininitRcslice!double(4, 4);
+    auto result2 = mininitRcslice!double(4, 3);
 
     x[] = a;
-    result[] = b;
+    y[] = b;
+    result1[] = c;
+    result2[] = d;
 
     auto xcross = x.crossprod;
-    assert(xcross == result);
+    assert(xcross == result1);
+    auto xycross = x.crossprod(y);
+    assert(xycross == result2);
 }
 
 /++
@@ -2611,7 +2799,6 @@ do
 {
     return a.mtimes(b);
 }
-
 
 /// ditto
 @safe pure nothrow @nogc
