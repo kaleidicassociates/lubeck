@@ -598,11 +598,11 @@ template mtimesSymmetric(Side side = Side.Left, Uplo uplo = Uplo.Upper)
         if (isFloatingPoint!T)
     in
     {
-        assert(a.length!1 == b.length!0);
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must match the first dimension of `b`");
         static if (side == Side.Left)
-            assert(a.length!0 == a.length!1);
+            assert(a.length!0 == a.length!1, "With `Side.Left`, `a` assumed to be a square matrix");
         else
-            assert(b.length!0 == b.length!1);
+            assert(b.length!0 == b.length!1, "With `Side.Right`, `b` assumed to be a square matrix");
     }
     out (c)
     {
@@ -847,7 +847,7 @@ template mtimesSymmetric(string side, string uplo = "Upper")
 unittest
 {
     import mir.algorithm.iteration: equal;
-    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.allocation: mininitRcslice, rcslice;
 
     static immutable a = [[3.0, 5, 2], [5.0, 2, 3], [2.0, 3, 1]];
     static immutable b = [[2.0, 3], [4.0, 3], [0.0, -5]];
@@ -2322,4 +2322,1204 @@ Returns:
     auto stdDev = mininitRcslice!double(2);
     assert(normalizeColumns(data, stdDev) == scaled);
     assert(stdDev == [2*sqrt(2.0), sqrt(2.0)]);
+}
+
+/++
+Given a matrix `a`, computes the matrix cross-product `a' * a`. Alternately,
+given matrices `a` and `b`, computes the matrix cross-product `a' * b`.
+
+This function uses more specialized algorithms than those used in `mtimes` where
+possible.
+
+In the vector case, the input is treated as a matrix whose first dimension has a
+length of 1. Since the input is represented in memory as a C-style row vector,
+that is the natural choice in this case.
+
+Params:
+    a = m(rows) x n(cols) matrix
+
+Result:
+    n(rows) x n(cols)
+
+See_also:
+    $(LINK2 https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/crossprod, R's crossprod function)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 2, sliceKind) a
+)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!0 == a.length!1, "The first dimension of the result must match the second dimension of the input");
+    assert(result.length!0 == result.length!1, "The result must be a square matrix");
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = mininitRcslice!T(a.length!1, a.length!1);
+    syrk(Uplo.Upper, cast(T)1, a.transposed, cast(T)0, result.lightScope);
+    result.eachUploPair!((u, ref l) { l = u; });
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    auto ref const Slice!(RCI!T, 2, sliceKind) a
+)
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA);
+}
+
+/++
+Params:
+    a = m(rows) x n(cols) matrix
+    b = m(rows) x p(cols) matrix
+
+Result:
+    n(rows) x p(cols)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 2, sliceKind) a,
+    Slice!(const(T)*, 2, sliceKind) b
+)
+    if (isFloatingPoint!T)
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+out (result)
+{
+    assert(result.length!0 == a.length!1, "The first dimension of the result must match the second dimension of `a`");
+    assert(result.length!1 == b.length!1, "The second dimension of the result must match the second dimension of `b`");
+}
+do
+{
+    return a.transposed.mtimes(b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    Slice!(const(B)*, 2, sliceKind) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!0 == b.length!0, "The first dimension of `a` must match the first dimension of `b`");
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(a, scopeB);
+}
+
+/++
+Params:
+    a = m(rows) x 1(cols) vector
+
+Result:
+    m(rows) x m(cols)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(Slice!(const(T)*, 1, sliceKind) a)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!1 == a.length, "The second dimension of the result must match the length of the input");
+    assert(result.length!0 == result.length!1, "The result must be a square matrix");
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = rcslice!T([a.length, a.length], 0);
+    syr(Uplo.Upper, cast(T)1, a, result.lightScope);
+    result.eachUploPair!((u, ref l) { l = u; });
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(auto ref const Slice!(RCI!T, 1, sliceKind) a)
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA);
+}
+
+/++
+Params:
+    a = m(rows) x 1(cols) vector
+    b = m(rows) x 1(cols) vector
+
+Result:
+    m(rows) x m(cols)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) crossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 1, sliceKind) a,
+    Slice!(const(T)*, 1, sliceKind) b
+)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!0 == a.length, "The first dimension of the result must match the length of `a`");
+    assert(result.length!1 == b.length, "The second dimension of the result must match the length of `b`");
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = rcslice!T([a.length, b.length], 0);
+    ger(cast(T)1, a, b, result.lightScope);
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    Slice!(const(B)*, 1, sliceKind) b
+)
+    if (is(Unqual!A == Unqual!B))
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .crossprod(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) crossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .crossprod(a, scopeB);
+}
+
+/// crossprod
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[3.0, 5, 2, -3],
+                          [-2.0, 2, 3, 10],
+                          [0.0, 2, 1, 1]];
+    static immutable b = [[ 1.0,  8],
+                          [ 7.0, -3],
+                          [-5.0,  2]];
+    static immutable c = [[13.0, 11, 0, -29],
+                          [11.0, 33, 18, 7],
+                          [0.0, 18, 14, 25],
+                          [-29.0, 7, 25, 110]];
+    static immutable d = [[-11.0,  30],
+                          [  9.0,  38],
+                          [ 18.0,   9],
+                          [ 62.0, -52]];
+
+    auto X = mininitRcslice!double(3, 4);
+    auto Y = mininitRcslice!double(3, 2);
+    auto result1 = mininitRcslice!double(4, 4);
+    auto result2 = mininitRcslice!double(4, 2);
+
+    X[] = a;
+    Y[] = b;
+    result1[] = c;
+    result2[] = d;
+
+    auto Xcross = X.crossprod;
+    assert(Xcross == result1);
+    auto XYcross = X.crossprod(Y);
+    assert(XYcross == result2);
+}
+
+/// crossprod (vector)
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [3.0, 5, 2, -3];
+    static immutable b = [-2.0, 2, 3];
+    static immutable c = [[ 9.0,  15,  6, -9],
+                          [15.0,  25, 10, -15],
+                          [ 6.0,  10,  4, -6],
+                          [-9.0, -15, -6,  9]];
+    static immutable d = [[ -6,  6,  9],
+                          [-10, 10, 15],
+                          [ -4,  4,  6],
+                          [ 6,  -6, -9]];
+
+    auto x = mininitRcslice!double(4);
+    auto y = mininitRcslice!double(3);
+    auto result1 = mininitRcslice!double(4, 4);
+    auto result2 = mininitRcslice!double(4, 3);
+
+    x[] = a;
+    y[] = b;
+    result1[] = c;
+    result2[] = d;
+
+    auto xcross = x.crossprod;
+    assert(xcross == result1);
+    auto xycross = x.crossprod(y);
+    assert(xycross == result2);
+}
+
+/++
+Given a matrix `a`, computes the matrix cross-product `a * a'`. Alternately,
+given matrices `a` and `b`, computes the matrix cross-product `a * b'`.
+
+This function uses more specialized algorithms than those used in `mtimes` where
+possible.
+
+In the vector case, the input is treated as a matrix whose first dimension has a
+length of 1. Since the input is represented in memory as a C-style row vector,
+that is the natural choice in this case.
+
+Params:
+    a = m(rows) x n(cols) matrix
+
+Result:
+    m(rows) x m(cols)
+
+See_also:
+    $(LINK2 https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/crossprod, R's crossprod function)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) tcrossprod(T, SliceKind sliceKind)(
+    Slice!(const(T)*, 2, sliceKind) a
+)
+    if (isFloatingPoint!T)
+out (result)
+{
+    assert(result.length!0 == a.length!0, "The first dimension of the result must match the first dimension of the input");
+    assert(result.length!0 == result.length!1, "The result must be a square matrix");
+}
+do
+{
+    import mir.algorithm.iteration: eachUploPair;
+
+    auto result = mininitRcslice!T(a.length!0, a.length!0);
+    syrk(Uplo.Upper, cast(T)1, a, cast(T)0, result.lightScope);
+    result.eachUploPair!((u, ref l) { l = u; });
+    return result;
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) tcrossprod(T, SliceKind sliceKind)(
+    auto ref const Slice!(RCI!T, 2, sliceKind) a
+)
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .tcrossprod(scopeA);
+}
+
+/++
+Params:
+    a = m(rows) x n(cols) matrix
+    b = p(rows) x n(cols) matrix
+
+Result:
+    m(rows) x p(cols)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) tcrossprod(T, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(T)*, 2, kindA) a,
+    Slice!(const(T)*, 2, kindB) b
+)
+    if (isFloatingPoint!T)
+in
+{
+    assert(a.length!1 == b.length!1);
+}
+out (result)
+{
+    assert(result.length!0 == a.length!0, "The first dimension of the result must match the first dimension of `a`");
+    assert(result.length!1 == b.length!0, "The second dimension of the result must match the first dimension of `b`");
+}
+do
+{
+    return a.mtimes(b.transposed);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) tcrossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!1);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .tcrossprod(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) tcrossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    Slice!(const(B)*, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!1);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .tcrossprod(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) tcrossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!1);
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .tcrossprod(a, scopeB);
+}
+
+/++
+Params:
+    a = m(rows) x 1(cols) vector
+
+Result:
+    scaler
++/
+@safe pure nothrow @nogc
+T tcrossprod(T, SliceKind sliceKind)(Slice!(const(T)*, 1, sliceKind) a)
+    if (isFloatingPoint!T)
+{
+    return a.mtimes(a);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+T tcrossprod(T, SliceKind sliceKind)(auto ref const Slice!(RCI!T, 1, sliceKind) a)
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .tcrossprod(scopeA);
+}
+
+/++
+Params:
+    a = m(rows) x 1(cols) vector
+    b = p(rows) x 1(cols) vector
+
+Result:
+    scaler
++/
+@safe pure nothrow @nogc
+T tcrossprod(T, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(T)*, 1, kindA) a,
+    Slice!(const(T)*, 1, kindB) b
+)
+    if (isFloatingPoint!T)
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    return a.mtimes(b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+A tcrossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .tcrossprod(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+A tcrossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 1, kindA) a,
+    Slice!(const(B)*, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .tcrossprod(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+A tcrossprod(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 1, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length == b.length);
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .tcrossprod(a, scopeB);
+}
+
+/// tcrossprod
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[ 3.0,  5,  2, -3],
+                          [-2.0,  2,  3, 10],
+                          [ 0.0,  2,  1,  1]];
+    static immutable b = [[-3.0, -5, 10, -3],
+                          [ 4.0,  7,  6,  9]];
+    static immutable c = [[ 47.0, -20, 9],
+                          [-20.0, 117, 17],
+                          [  9.0,  17, 6]];
+    static immutable d = [[ -5.0,  32],
+                          [ -4.0, 114],
+                          [ -3.0,  29]];
+
+    auto X = mininitRcslice!double(3, 4);
+    auto Y = mininitRcslice!double(2, 4);
+    auto result1 = mininitRcslice!double(3, 3);
+    auto result2 = mininitRcslice!double(3, 2);
+
+    X[] = a;
+    Y[] = b;
+    result1[] = c;
+    result2[] = d;
+
+    auto Xtcross = X.tcrossprod;
+    assert(Xtcross == result1);
+    auto XYtcross = X.tcrossprod(Y);
+    assert(XYtcross == result2);
+}
+
+/// tcrossprod (vector)
+@safe pure nothrow @nogc
+unittest
+{
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [3.0, 5, 2, -3];
+    static immutable b = [-2.0, 2, 3, 10];
+
+    auto x = mininitRcslice!double(4);
+    auto y = mininitRcslice!double(4);
+
+    x[] = a;
+    y[] = b;
+
+    auto xtcross = x.tcrossprod;
+    assert(xtcross == 47);
+    auto xytcross = x.tcrossprod(y);
+    assert(xytcross == -20);
+}
+
+/++
+Given a square matrix `a` and another matrix `b`, computes the quadratic form
+`b' * a * b`.
+
+Params:
+    a = input `M x M` matrix
+    b = input `M x N` matrix
+
+Returns:
+    `N x N` matrix
+
+See_also:
+    $(WEB en.wikipedia.org/wiki/Quadratic_form, Quadratic Form)
++/
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!T), 2) quadraticForm(T, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(T)*, 2, kindA) a,
+    Slice!(const(T)*, 2, kindB) b
+)
+    if (isFloatingPoint!T)
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+out (result)
+{
+    assert(result.length!0 == b.length!1, "The first dimension of the result must match the second dimension of `b`");
+    assert(result.length!0 == result.length!1, "`result` must be a square matrix");
+}
+do
+{
+    auto result = a.mtimes(b);
+    return b.transposed.mtimes(result);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) quadraticForm(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .quadraticForm(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) quadraticForm(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    Slice!(const(B)*, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .quadraticForm(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Slice!(RCI!(Unqual!A), 2) quadraticForm(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 2, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .quadraticForm(a, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+T quadraticForm(T, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(T)*, 2, kindA) a,
+    Slice!(const(T)*, 1, kindB) b
+)
+    if (isFloatingPoint!T)
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+do
+{
+    auto result = a.mtimes(b);
+    return result.mtimes(b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Unqual!A quadraticForm(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    auto scopeB = b.lightScope.lightConst;
+    return .quadraticForm(scopeA, scopeB);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Unqual!A quadraticForm(A, B, SliceKind kindA, SliceKind kindB)(
+    auto ref const Slice!(RCI!A, 2, kindA) a,
+    Slice!(const(B)*, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+do
+{
+    auto scopeA = a.lightScope.lightConst;
+    return .quadraticForm(scopeA, b);
+}
+
+/// ditto
+@safe pure nothrow @nogc
+Unqual!A quadraticForm(A, B, SliceKind kindA, SliceKind kindB)(
+    Slice!(const(A)*, 2, kindA) a,
+    auto ref const Slice!(RCI!B, 1, kindB) b
+)
+    if (is(Unqual!A == Unqual!B))
+in
+{
+    assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+    assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+}
+do
+{
+    auto scopeB = b.lightScope.lightConst;
+    return .quadraticForm(a, scopeB);
+}
+
+///
+@safe pure
+unittest {
+    import mir.ndslice.fuse: fuse;
+    import mir.ndslice.slice: sliced;
+
+    auto sigma = [[1.0,  2, 3],
+                  [10.0, 9, 8],
+                  [5.0,  6, 7]].fuse;
+    auto w = [[1.0, 2],
+              [2.0, 6],
+              [4.0, 1]].fuse;
+    auto result = [[317.0, 393],
+                   [439.0, 579]].fuse;
+
+    auto val = sigma.quadraticForm(w);
+    assert(val == result);
+}
+
+/// Ditto, but RC
+@safe pure nothrow @nogc
+unittest {
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[1.0,  2, 3],
+                          [10.0, 9, 8],
+                          [5.0,  6, 7]];
+    static immutable b = [[1.0, 2],
+                          [2.0, 6],
+                          [4.0, 1]];
+    static immutable c = [[317.0, 393],
+                          [439.0, 579]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3, 2);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticForm(w);
+    assert(val == result);
+}
+
+// make sure it works with a transpose
+@safe pure nothrow @nogc
+unittest {
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.dynamic: transposed;
+
+    static immutable a = [[1.0,  2, 3],
+                          [10.0, 9, 8],
+                          [5.0,  6, 7]];
+    static immutable b = [[1.0, 2, 4],
+                          [2.0, 6, 1]];
+    static immutable c = [[317.0, 393],
+                          [439.0, 579]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(2, 3);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticForm(w.transposed);
+    assert(val == result);
+}
+
+/// quadraticForm (vector)
+@safe pure
+unittest {
+    import mir.ndslice.fuse: fuse;
+    import mir.ndslice.slice: sliced;
+    import mir.test: should;
+
+    auto sigma = [[1.0,  2, 3],
+                  [10.0, 9, 8],
+                  [5.0,  6, 7]].fuse;
+    auto w = [1.0, 2, 4].sliced;
+    double val = sigma.quadraticForm(w);
+    val.should == 317;
+}
+
+/// Ditto, but RC
+@safe pure nothrow @nogc
+unittest {
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.test: should;
+
+    static immutable a = [[1.0,  2, 3],
+                          [10.0, 9, 8],
+                          [5.0,  6, 7]];
+    static immutable b = [1.0, 2, 4];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3);
+
+    sigma[] = a;
+    w[] = b;
+
+    double val = sigma.quadraticForm(w);
+    val.should == 317;
+}
+
+/++
+Given a symmetric square matrix `a` and another matrix `b`, computes the
+quadratic form `b' * a * b`.
+
+Params:
+    a = input `M x M` matrix
+    b = input `M x N` matrix
+
+Returns:
+    `N x N` matrix
+
+See_also:
+    $(WEB en.wikipedia.org/wiki/Quadratic_form, Quadratic Form)
++/
+@safe pure nothrow @nogc
+template quadraticFormSymmetric(Uplo uplo = Uplo.Upper)
+{
+    Slice!(RCI!(Unqual!T), 2) quadraticFormSymmetric(T, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(T)*, 2, kindA) a,
+        Slice!(const(T)*, 2, kindB) b
+    )
+        if (isFloatingPoint!T)
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    out (result)
+    {
+        assert(result.length!0 == b.length!1, "The first dimension of the result must match the second dimension of `b`");
+        assert(result.length!0 == result.length!1, "`result` must be a square matrix");
+    }
+    do
+    {
+        static if (kindB == Universal) {
+            if (b._stride!1 != 1)
+            {
+                auto result = b.transposed.mtimesSymmetric!(Side.Right, uplo)(a);
+                return result.mtimes(b);
+            }
+        }
+        auto result = a.mtimesSymmetric!(Side.Left, uplo)(b);
+        return b.transposed.mtimes(result);
+    }
+
+    /// ditto
+    Slice!(RCI!(Unqual!A), 2) quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 2, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, scopeB);
+    }
+
+    /// ditto
+    Slice!(RCI!(Unqual!A), 2) quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        Slice!(const(B)*, 2, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, b);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Slice!(RCI!(Unqual!A), 2) quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(A)*, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 2, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the first dimension of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(a, scopeB);
+    }
+
+    /// ditto
+    T quadraticFormSymmetric(T, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(T)*, 2, kindA) a,
+        Slice!(const(T)*, 1, kindB) b
+    )
+        if (isFloatingPoint!T)
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto result = a.mtimesSymmetric!uplo(b);
+        return result.mtimes(b);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Unqual!A quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 1, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, scopeB);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Unqual!A quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        auto ref const Slice!(RCI!A, 2, kindA) a,
+        Slice!(const(B)*, 1, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeA = a.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(scopeA, b);
+    }
+
+    /// ditto
+    @safe pure nothrow @nogc
+    Unqual!A quadraticFormSymmetric(A, B, SliceKind kindA, SliceKind kindB)(
+        Slice!(const(A)*, 2, kindA) a,
+        auto ref const Slice!(RCI!B, 1, kindB) b
+    )
+        if (is(Unqual!A == Unqual!B))
+    in
+    {
+        assert(a.length!1 == b.length!0, "The second dimension of `a` must be equal to the length of `b`");
+        assert(a.length!0 == a.length!1, "`a` must be a square matrix");
+    }
+    do
+    {
+        auto scopeB = b.lightScope.lightConst;
+        return .quadraticFormSymmetric!uplo(a, scopeB);
+    }
+}
+
+/// ditto
+template quadraticFormSymmetric(string uplo)
+{
+    mixin("alias quadraticFormSymmetric = .quadraticFormSymmetric!(Uplo." ~ uplo ~ ");");
+}
+
+///
+@safe pure
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.fuse: fuse;
+    import mir.ndslice.slice: sliced;
+
+    auto sigma = [[0.010, 0.0030, 0.006],
+                  [0,     0.0225, 0.012],
+                  [0,     0,      0.040]].fuse;
+    auto w = [[0.25, 0.3],
+              [0.30, 0.4],
+              [0.45, 0.3]].fuse;
+    auto result = [[0.01579, 0.01392],
+                   [0.01392, 0.01278]].fuse;
+
+    auto val = sigma.quadraticFormSymmetric(w);
+    assert(val.equal!approxEqual(result));
+}
+
+/// Ditto, but RC
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[0.010, 0.0030, 0.006],
+                          [0,     0.0225, 0.012],
+                          [0,     0,      0.040]];
+    static immutable b = [[0.25, 0.3],
+                          [0.30, 0.4],
+                          [0.45, 0.3]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3, 2);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric(w);
+    assert(val.equal!approxEqual(result));
+}
+
+// make sure it works with a transpose
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.dynamic: transposed;
+
+    static immutable a = [[0.010, 0.0030, 0.006],
+                          [0,     0.0225, 0.012],
+                          [0,     0,      0.040]];
+    static immutable b = [[0.25, 0.3, 0.45],
+                          [0.30, 0.4, 0.30]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(2, 3);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric(w.transposed);
+    assert(val.equal!approxEqual(result));
+}
+
+/// quadraticFormSymmetric (vector)
+@safe pure
+unittest {
+    import mir.ndslice.fuse: fuse;
+    import mir.ndslice.slice: sliced;
+    import mir.test: shouldApprox;
+
+    auto sigma = [[0.010, 0.0030, 0.006],
+                  [0,     0.0225, 0.012],
+                  [0,     0,      0.040]].fuse;
+    auto w = [0.25, 0.3, 0.45].sliced;
+    double val = sigma.quadraticFormSymmetric(w);
+    val.shouldApprox == 0.01579;
+}
+
+/// Ditto, but RC
+@safe pure nothrow @nogc
+unittest {
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.test: shouldApprox;
+
+    static immutable a = [[0.010, 0.0030, 0.006],
+                          [0,     0.0225, 0.012],
+                          [0,     0,      0.040]];
+    static immutable b = [0.25, 0.3, 0.45];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3);
+
+    sigma[] = a;
+    w[] = b;
+
+    double val = sigma.quadraticFormSymmetric(w);
+    val.shouldApprox == 0.01579;
+}
+
+/// Use template parameter if using lower triangular symmetric matrix
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+
+    static immutable a = [[0.0100, 0,      0],
+                          [0.0030, 0.0225, 0],
+                          [0.0060, 0.012,  0.040]];
+    static immutable b = [[0.25, 0.3],
+                          [0.30, 0.4],
+                          [0.45, 0.3]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(3, 2);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric!"Lower"(w);
+    assert(val.equal!approxEqual(result));
+}
+
+// transposed version with lower triangular symmetric matrix
+@safe pure nothrow @nogc
+unittest {
+    import mir.algorithm.iteration: equal;
+    import mir.math.common: approxEqual;
+    import mir.ndslice.allocation: mininitRcslice;
+    import mir.ndslice.dynamic: transposed;
+
+    static immutable a = [[0.0100, 0,      0],
+                          [0.0030, 0.0225, 0],
+                          [0.0060, 0.012,  0.040]];
+    static immutable b = [[0.25, 0.3, 0.45],
+                          [0.30, 0.4, 0.30]];
+    static immutable c = [[0.01579, 0.01392],
+                          [0.01392, 0.01278]];
+
+    auto sigma = mininitRcslice!double(3, 3);
+    auto w = mininitRcslice!double(2, 3);
+    auto result = mininitRcslice!double(2, 2);
+
+    sigma[] = a;
+    w[] = b;
+    result[] = c;
+
+    auto val = sigma.quadraticFormSymmetric!"Lower"(w.transposed);
+    assert(val.equal!approxEqual(result));
 }
